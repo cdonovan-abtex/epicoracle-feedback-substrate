@@ -26,6 +26,10 @@ import os
 import subprocess
 import sys
 
+# Make the sibling _skip_helper importable when invoked from any cwd
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent))
+from _skip_helper import skip_if_no_key  # noqa: E402
+
 
 def _comment_on_issue(issue_number: str, repo: str, body: str) -> None:
     subprocess.run(
@@ -39,6 +43,15 @@ def _comment_on_issue(issue_number: str, repo: str, body: str) -> None:
 def main() -> int:
     issue_number = os.environ.get("ISSUE_NUMBER", "").strip()
     repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+    # v0.1 graceful-skip: if the LLM API key isn't configured yet, log + exit 0
+    if skip_if_no_key(
+        key_var="CODEX_API_KEY",
+        issue_number=issue_number,
+        repo=repo,
+        step_name="trinity-dispatch (Codex side)",
+    ):
+        return 0
 
     if not issue_number:
         print("trinity_dispatch: ISSUE_NUMBER not set", file=sys.stderr)

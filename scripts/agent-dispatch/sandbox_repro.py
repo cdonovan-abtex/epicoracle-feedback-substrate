@@ -39,6 +39,10 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# Make the sibling _skip_helper importable when invoked from any cwd
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent))
+from _skip_helper import skip_if_no_key  # noqa: E402
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -120,6 +124,15 @@ def main() -> int:
     issue_number = os.environ.get("ISSUE_NUMBER", "").strip()
     issue_body = os.environ.get("ISSUE_BODY", "")
     repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+    # v0.1 graceful-skip: if the LLM API key isn't configured yet, log + exit 0
+    if skip_if_no_key(
+        key_var="CODEX_API_KEY",
+        issue_number=issue_number,
+        repo=repo,
+        step_name="sandbox-repro",
+    ):
+        return 0
     satellite = os.environ.get("SATELLITE_SLUG", "marketplace")
 
     if not (issue_number and repo):
