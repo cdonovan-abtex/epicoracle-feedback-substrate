@@ -10,5 +10,5 @@
 # Pinned versions: bump intentionally; substrate release + CHANGELOG.
 
 anthropic>=0.40,<1.0
-# openai>=1.50,<2.0           # uncomment when fix_pr.py + trinity_dispatch.py wire Codex
-# google-generativeai>=0.8    # uncomment when trinity_dispatch.py wires Gemini
+openai>=1.50,<2.0              # fix_pr.py + trinity_dispatch.py (Codex side)
+# google-generativeai>=0.8     # uncomment when trinity_dispatch.py wires Gemini
