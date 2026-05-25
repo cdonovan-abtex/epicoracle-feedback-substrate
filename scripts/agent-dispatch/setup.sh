@@ -57,4 +57,15 @@ if [[ -f "pyproject.toml" ]]; then
     uv sync --frozen 2>/dev/null || uv sync
 fi
 
+# ---- Agent-dispatch runtime deps (LLM SDKs) -------------------------------
+
+# These are scoped to the agent-dispatch scripts only — NOT bundled into
+# the substrate package consumers install (satellites don't need LLM SDKs
+# at runtime; only the CI workflow does).
+DISPATCH_REQS=".substrate/scripts/agent-dispatch/requirements.txt"
+if [[ -f "${DISPATCH_REQS}" ]]; then
+    log "Installing agent-dispatch deps from ${DISPATCH_REQS}"
+    uv pip install -r "${DISPATCH_REQS}"
+fi
+
 log "Setup complete."
