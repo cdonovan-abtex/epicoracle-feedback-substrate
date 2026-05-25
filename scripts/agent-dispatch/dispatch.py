@@ -28,6 +28,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Make sibling _llm_helpers importable when invoked from any cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _llm_helpers import transition_status  # noqa: E402
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 MAX_ATTEMPTS = 3
 """Termination ceiling per v2 brief: max 3 attempts per step before
@@ -42,16 +46,26 @@ DECISION_TO_SCRIPT: dict[str, tuple[str, ...]] = {
 
 
 def _label_issue(issue_number: str, label: str) -> None:
-    """Apply a label via ``gh``. Best-effort; logs but does not raise."""
+    """Transition the agent/status:* label atomically (remove all other
+    status labels first, then add the target). Best-effort.
+
+    v0.2.0a5: delegates to _llm_helpers.transition_status so the v0.1.x
+    label-accumulation bug (queued + processing + fix-ready all stuck) is
+    fixed at the orchestrator layer too, not just inside answer_draft/fix_pr.
+    """
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     if not (issue_number and repo):
         return
-    subprocess.run(
-        ["gh", "issue", "edit", issue_number, "--repo", repo, "--add-label", label],
-        capture_output=True,
-        check=False,
-        timeout=15,
-    )
+    try:
+        transition_status(issue_number=issue_number, repo=repo, to_label=label)
+    except ValueError:
+        # transition_status only accepts known agent/status:* labels; for any
+        # other label (legacy flat ones, etc.) fall back to plain add.
+        subprocess.run(
+            ["gh", "issue", "edit", issue_number, "--repo", repo,
+             "--add-label", label],
+            capture_output=True, check=False, timeout=15,
+        )
 
 
 def _comment_on_issue(issue_number: str, body: str) -> None:

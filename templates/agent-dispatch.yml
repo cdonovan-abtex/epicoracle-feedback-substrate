@@ -31,7 +31,23 @@ permissions:
 
 jobs:
   dispatch:
-    if: contains(github.event.issue.labels.*.name, 'feedback/source:operator')
+    # Fire ONLY on:
+    #   - issue opened with the feedback/source:operator label (substrate's
+    #     dispatch_feedback applies the label at creation time, so labels[] is
+    #     populated at the opened event)
+    #   - human manually adds the feedback/source:operator label to an existing
+    #     issue (retroactive routing of a hand-filed bug into the substrate)
+    # NOT on:
+    #   - the agent's own agent/status:* label transitions (queued → processing
+    #     → fix-ready / needs-human). v0.1.x re-fired the entire workflow on
+    #     every label add, producing 4× duplicated runs per issue + 16+ bot
+    #     comments per submission. v0.2.0a5: trigger filter restricts to the
+    #     routing-label add or the initial opened event.
+    if: >
+      contains(github.event.issue.labels.*.name, 'feedback/source:operator') &&
+      (github.event.action == 'opened' ||
+       (github.event.action == 'labeled' &&
+        github.event.label.name == 'feedback/source:operator'))
     runs-on: ubuntu-latest
     # Environment gate — org secrets are scoped here. First-time use
     # requires Christian's manual approval; subsequent runs are

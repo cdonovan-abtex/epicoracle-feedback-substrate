@@ -143,11 +143,13 @@ def main() -> int:
     image = _ghcr_image(satellite)
 
     if not _pull_image(image):
-        _post_repro_comment(
-            issue_number,
-            repo,
-            "Repro failed (image pull error)",
-            {"route_path": route_path},
+        # v0.2.0a5: silent on per-attempt failures. dispatch.py retries this
+        # up to MAX_ATTEMPTS and posts ONE summary bail-comment if all attempts
+        # fail. Posting per-attempt comments here multiplied the noise (16+
+        # comments per issue → 16+ emails to the issue author).
+        print(
+            f"sandbox: image pull failed for {image} — exiting non-zero (silent)",
+            file=sys.stderr,
         )
         return 1
 
@@ -160,12 +162,8 @@ def main() -> int:
     ]
 
     if not _start_container(image, synthetic_env):
-        _post_repro_comment(
-            issue_number,
-            repo,
-            "Repro failed (container start error)",
-            {"route_path": route_path},
-        )
+        # v0.2.0a5: silent per-attempt — see _pull_image comment above
+        print("sandbox: container start failed — exiting non-zero (silent)", file=sys.stderr)
         return 1
 
     # NB: Playwright orchestration intentionally left as a contract for

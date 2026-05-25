@@ -1,6 +1,6 @@
 [project]
 name = "epicoracle-feedback"
-version = "0.2.0a4"
+version = "0.2.0a5"
 description = "Shared operator-feedback substrate for the EpicOracle Family — fail-soft GitHub Issues dispatcher + agent-dispatch scripts + workflow templates."
 readme = "README.md"
 requires-python = ">=3.12"

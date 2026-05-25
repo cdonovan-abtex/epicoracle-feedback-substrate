@@ -37,24 +37,23 @@ def skip_if_no_key(
     repo: str,
     step_name: str,
 ) -> bool:
-    """If ``key_var`` env var is unset/empty, post a skip-comment on the
-    issue and return True. Caller should exit 0 immediately.
+    """If ``key_var`` env var is unset/empty, log + return True.
+    Caller should exit 0 immediately.
 
     Returns False if the key is present (caller proceeds normally).
+
+    v0.2.0a5: silent skip — does NOT post an issue comment anymore.
+    Earlier behavior posted a comment per skip, which combined with
+    dispatch retries and label-change re-fires produced 16+ bot
+    comments per issue (= 16+ emails to the issue author). The audit
+    trail is in the workflow run log; the issue thread stays clean.
+
+    Repo + issue_number kept in the signature for API stability +
+    potential future use (e.g., when a configurable "verbose" mode
+    surfaces skips to operators).
     """
+    del issue_number, repo  # intentionally unused after v0.2.0a5 silencing
     if os.environ.get(key_var, "").strip():
         return False
-    body = (
-        f"⏭️ **{step_name}** skipped — `{key_var}` not configured in the "
-        f"`agent-dispatch` environment yet.\n\n"
-        f"The feedback substrate is live and your submission is queued. "
-        f"The LLM-backed automation that would normally process this step "
-        f"is gated on the API key being set at the org level. Manual "
-        f"triage applies until the key is added.\n\n"
-        f"_Per the v2 brief's v0.1 scope, this is expected behavior — "
-        f"automation lights up incrementally as keys are configured._"
-    )
-    if issue_number and repo:
-        _comment_on_issue(issue_number, repo, body)
-    print(f"[skip_helper] {step_name}: {key_var} not set; exiting 0")
+    print(f"[skip_helper] {step_name}: {key_var} not set; exiting 0 (silent)")
     return True
