@@ -63,15 +63,33 @@ fi
 # the substrate package consumers install (satellites don't need LLM SDKs
 # at runtime; only the CI workflow does).
 #
-# --system installs into the runner's system Python instead of requiring a
-# venv. CI runners are ephemeral, so isolation isn't a concern; this also
-# means we don't depend on the earlier `uv sync` having created a venv
-# (it's conditional on satellite pyproject.toml at repo root, which isn't
-# guaranteed — e.g., hub's pyproject lives at backend/).
+# Strategy: create a dedicated venv at .agent-dispatch-venv/ so we don't
+# fight Ubuntu's PEP 668 externally-managed Python protection AND don't
+# depend on the earlier `uv sync` having created a venv (which only runs
+# if a satellite pyproject.toml is at repo root — not guaranteed for hub).
+#
+# After install, prepend the venv's bin to GITHUB_PATH so subsequent
+# workflow steps (triage.py, dispatch.py, answer_draft.py, etc.) resolve
+# `python` to the venv's Python with anthropic + openai + google-generativeai
+# already importable.
 DISPATCH_REQS=".substrate/scripts/agent-dispatch/requirements.txt"
+DISPATCH_VENV="$(pwd)/.agent-dispatch-venv"
 if [[ -f "${DISPATCH_REQS}" ]]; then
-    log "Installing agent-dispatch deps from ${DISPATCH_REQS}"
-    uv pip install --system -r "${DISPATCH_REQS}"
+    if [[ ! -d "${DISPATCH_VENV}" ]]; then
+        log "Creating dispatch venv at ${DISPATCH_VENV}"
+        uv venv "${DISPATCH_VENV}" --python "${PYTHON_VERSION}"
+    fi
+    log "Installing agent-dispatch deps from ${DISPATCH_REQS} into ${DISPATCH_VENV}"
+    VIRTUAL_ENV="${DISPATCH_VENV}" uv pip install -r "${DISPATCH_REQS}"
+    # Make the venv's binaries visible to subsequent workflow steps
+    # (GITHUB_PATH is the canonical mechanism for cross-step PATH propagation)
+    if [[ -n "${GITHUB_PATH:-}" ]]; then
+        echo "${DISPATCH_VENV}/bin" >> "${GITHUB_PATH}"
+        log "Added ${DISPATCH_VENV}/bin to GITHUB_PATH"
+    else
+        log "GITHUB_PATH not set (not running in Actions?) — skipping PATH propagation"
+        export PATH="${DISPATCH_VENV}/bin:${PATH}"
+    fi
 fi
 
 log "Setup complete."
