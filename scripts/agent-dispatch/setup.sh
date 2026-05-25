@@ -62,10 +62,16 @@ fi
 # These are scoped to the agent-dispatch scripts only — NOT bundled into
 # the substrate package consumers install (satellites don't need LLM SDKs
 # at runtime; only the CI workflow does).
+#
+# --system installs into the runner's system Python instead of requiring a
+# venv. CI runners are ephemeral, so isolation isn't a concern; this also
+# means we don't depend on the earlier `uv sync` having created a venv
+# (it's conditional on satellite pyproject.toml at repo root, which isn't
+# guaranteed — e.g., hub's pyproject lives at backend/).
 DISPATCH_REQS=".substrate/scripts/agent-dispatch/requirements.txt"
 if [[ -f "${DISPATCH_REQS}" ]]; then
     log "Installing agent-dispatch deps from ${DISPATCH_REQS}"
-    uv pip install -r "${DISPATCH_REQS}"
+    uv pip install --system -r "${DISPATCH_REQS}"
 fi
 
 log "Setup complete."
