@@ -39,7 +39,13 @@ applying ``agent/status:needs-human`` and ending the workflow."""
 
 DECISION_TO_SCRIPT: dict[str, tuple[str, ...]] = {
     "sandbox": ("sandbox_repro.py", "fix_pr.py"),
-    "trinity": ("trinity_dispatch.py", "fix_pr.py"),
+    # Trinity is analysis-only: Codex + Gemini critiques + Claude reconciliation
+    # produce a design-conversation artifact for Christian's review. No auto-PR.
+    # If the reconciled output later moves to "build", that's a separate
+    # manual decision (potentially a follow-up fix_pr or a real architectural
+    # brief). v0.1 wired fix_pr as a follow-up; v0.2 removes that — trinity
+    # terminates at fix-ready and Christian decides next steps.
+    "trinity": ("trinity_dispatch.py",),
     "answer-draft": ("answer_draft.py",),
     "needs-human": (),
 }
@@ -138,7 +144,11 @@ def main() -> int:
         if rc != 0:
             return rc
 
-    _label_issue(issue_number, "agent/status:fix-ready")
+    # Each downstream script owns its own terminal status transition
+    # (fix-ready on success, needs-human on bail). Don't override here —
+    # v0.1 unconditionally set fix-ready, which silently undid scripts that
+    # bailed to needs-human after a 0-exit graceful path. v0.2.0a6: trust
+    # the script.
     return 0
 
 
