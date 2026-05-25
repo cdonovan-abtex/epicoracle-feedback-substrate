@@ -1,0 +1,44 @@
+# Tag-driven release notes for the substrate.
+#
+# On every ``v*`` tag push, generate a GitHub release with notes lifted
+# from CHANGELOG.md. Satellites pin to a specific tag — releases serve
+# as the contract record for what changed between pins.
+
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract changelog entry for this tag
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          echo "Tag: $TAG" >&2
+          # Pull the section from CHANGELOG.md between this version and the
+          # next "## " header.
+          awk -v tag="$TAG" '
+            $0 ~ "^## \\["tag"\\]" { in_section=1; next }
+            in_section && /^## \[/ { exit }
+            in_section { print }
+          ' CHANGELOG.md > release_notes.md
+          if [[ ! -s release_notes.md ]]; then
+            echo "No changelog entry for $TAG" > release_notes.md
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file release_notes.md

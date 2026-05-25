@@ -1,0 +1,59 @@
+# Build & publish satellite Docker image to GHCR on main-branch merge.
+#
+# Each satellite installs this file at .github/workflows/build-ghcr-image.yml.
+# Produces two tags per build:
+#
+#   ghcr.io/cdonovan-abtex/<repo>:main-latest     ← always the freshest main
+#   ghcr.io/cdonovan-abtex/<repo>:sha-<sha>       ← reproducibility anchor
+#
+# The agent-dispatch sandbox pulls ``main-latest`` for repro runs. Sha tags
+# stay around in case we need to bisect ("when did this bug get introduced
+# vs. fixed?").
+#
+# Per-satellite Dockerfile requirements (documented in substrate README):
+#
+#   * Default ENV runs in synthetic mode (SYNTHETIC_MODE=true, AUTH_DISABLED=true)
+#   * Health endpoint at GET /health returning 200 when ready
+#   * Listens on port 8000 by default
+#   * No external network dependencies in synthetic mode
+#
+# This workflow uses the GITHUB_TOKEN — no additional secret rotation. The
+# ``packages: write`` permission is the minimum needed to push to GHCR.
+
+name: Build & Publish Image
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/cdonovan-abtex/${{ github.event.repository.name }}:main-latest
+            ghcr.io/cdonovan-abtex/${{ github.event.repository.name }}:sha-${{ github.sha }}
+          # Cache layers across builds — Buildx-native, no extra config.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

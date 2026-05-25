@@ -1,0 +1,17 @@
+# CODEOWNERS for the substrate itself.
+#
+# Substrate releases are the contract that all four satellites pin to.
+# A bad release blast-radiuses across the family. CODEOWNERS makes
+# Christian the required reviewer on every change.
+
+* @cdonovan-abtex
+
+# Workflow files — extra-careful zone for the substrate's own CI.
+/.github/workflows/ @cdonovan-abtex
+
+# Public-API surfaces of the package. Every change here is a potential
+# satellite-breaking change.
+/src/epicoracle_feedback/__init__.py @cdonovan-abtex
+/src/epicoracle_feedback/payload.py @cdonovan-abtex
+/src/epicoracle_feedback/dispatch.py @cdonovan-abtex
+/pyproject.toml @cdonovan-abtex

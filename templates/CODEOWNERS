@@ -1,0 +1,25 @@
+# CODEOWNERS — per-satellite template.
+#
+# Each satellite installs this file at .github/CODEOWNERS. The substrate
+# repo has its own CODEOWNERS at the equivalent path.
+#
+# v2 brief requirement: Christian on *, with a SEPARATE narrower scope
+# for .github/workflows/** so workflow-file edits get extra attention.
+# Branch protection's "Require review from Code Owners" reads this file.
+
+# Default owner — everything not matched below.
+* @cdonovan-abtex
+
+# Workflow files — extra-careful zone. Same owner today, but listed
+# separately so a future split (e.g. a "release engineer" role) is a
+# one-line change here, not a CODEOWNERS rewrite.
+/.github/workflows/ @cdonovan-abtex
+
+# Substrate consumption — anything that pins the substrate version.
+/pyproject.toml @cdonovan-abtex
+/uv.lock @cdonovan-abtex
+
+# Deploy + auth — agent-blocked paths (mirrors path_guard.py).
+/deploy/ @cdonovan-abtex
+/auth/ @cdonovan-abtex
+/Dockerfile @cdonovan-abtex

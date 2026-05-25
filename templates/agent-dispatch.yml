@@ -1,0 +1,88 @@
+# Agent-dispatch workflow — per-satellite copy.
+#
+# Each satellite installs this file at .github/workflows/agent-dispatch.yml.
+# The substrate's scripts/agent-dispatch/ directory does the heavy lifting;
+# this workflow's job is the security envelope:
+#
+#   * Explicit ``permissions:`` (no admin, no workflows-write)
+#   * Untrusted operator content goes through the ``env:`` block — NEVER
+#     ${{ }} into inline run blocks (closes Gemini BLOCKER 1)
+#   * Org-level secrets gated behind ``environment: agent-dispatch`` for
+#     manual approval
+#   * Path-guard step rejects PRs touching off-limits paths
+#
+# Per the v2 brief, the substrate is consumed via:
+#   pyproject:  epicoracle-feedback @ git+https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git@v0.1.0
+# Scripts are invoked from the installed package or from a vendored copy
+# of the substrate cloned at workflow runtime — see setup.sh.
+
+name: Agent Dispatch
+on:
+  issues:
+    types: [opened, labeled]
+
+# Least-privilege: the workflow can read code, write to issues, write to
+# pull requests. It CANNOT modify admin settings, cannot edit workflows,
+# cannot publish packages.
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  dispatch:
+    if: contains(github.event.issue.labels.*.name, 'feedback/source:operator')
+    runs-on: ubuntu-latest
+    # Environment gate — org secrets are scoped here. First-time use
+    # requires Christian's manual approval; subsequent runs are
+    # autonomous within the same workflow run.
+    environment: agent-dispatch
+    timeout-minutes: 15
+
+    # CRITICAL: untrusted operator content is funnelled through env vars,
+    # never inline-interpolated in run blocks. This is the RCE-prevention
+    # boundary called out by both trinity reviewers.
+    env:
+      ISSUE_TITLE: ${{ github.event.issue.title }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      SATELLITE_SLUG: ${{ vars.SATELLITE_SLUG }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Org-level secrets, scoped to this environment.
+      CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - name: Checkout (satellite repo, with substrate as submodule or pip dep)
+        uses: actions/checkout@v4
+
+      - name: Checkout substrate scripts (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: cdonovan-abtex/epicoracle-feedback-substrate
+          ref: v0.1.0
+          path: .substrate
+          token: ${{ secrets.SUBSTRATE_READ_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Setup runner (uv + node + playwright, pinned)
+        run: bash .substrate/scripts/agent-dispatch/setup.sh
+
+      - name: Triage (classify the issue)
+        id: triage
+        run: python .substrate/scripts/agent-dispatch/triage.py
+
+      - name: Dispatch (sandbox / trinity / answer-draft)
+        env:
+          CLASSIFIER_DECISION: ${{ steps.triage.outputs.classifier_decision }}
+          CLASSIFICATION: ${{ steps.triage.outputs.classification }}
+        run: python .substrate/scripts/agent-dispatch/dispatch.py
+
+      # Path-allowlist guard runs only if a PR was opened. The guard
+      # fails the workflow if the PR touches blocked paths — blocking
+      # auto-merge until a human review removes the violation.
+      - name: Path-allowlist guard (PR safety net)
+        if: success() && env.PR_NUMBER != ''
+        env:
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+        run: python .substrate/scripts/agent-dispatch/path_guard.py
