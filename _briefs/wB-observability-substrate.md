@@ -79,14 +79,13 @@ Trinity-vet ran 2026-05-27 13:00 EDT. Codex MCP critique (implementation-correct
 - **B-1 domain/infrastructure conflation** → resolved by D-5 (validation-progress moved out)
 - **OQ-2 static-asset exclusion fragility** → middleware default excludes by **response Content-Type** (`image/*`, `text/css`, `application/javascript`, etc.) rather than path patterns. Path patterns remain as supplementary configurable override. Framework-agnostic.
 
-### New open questions surfaced for Christian (Phase 4 ratification gate)
+### Phase 4 ratifications (Christian, 2026-05-27 13:25 EDT)
 
-1. **Scope-cut ratification**: v2 strips validation-progress server-side persistence from Wave B. Trinity convergent recommendation is to ship it as a compliance-internal wave (compliance-W3) instead. **Do you ratify the scope cut, or push back to keep validation-progress in Wave B?**
-2. **Admin-on-Funnel security posture** (Codex's load-bearing concern): The 3 satellites are publicly Funnel-exposed via Tailscale. Admin endpoints will be on the same surface. Three options for v2:
-   - **(a)** Admin endpoints are hard-disabled on Funnel-routed satellites until real Entra ships (W2-scope) — safest, blocks operator until then
-   - **(b)** Admin endpoints are gated to tailnet-only routes via Tailscale serve config (no Funnel exposure) — network-level control, operator must Tailscale to use admin — *recommended default*
-   - **(c)** Add a separate admin-only auth shim (basic auth or signed token) just for admin endpoints until Entra lands — code-level control, operator-friendlier, more surface
-3. **Default retention cap**: v2 default is 100k entries OR 100MB per satellite, whichever first. **Confirm this is right for production substrate, or specify a different default.**
+All three open questions resolved before dispatch. v2 build dispatched against these decisions.
+
+1. **Scope cut ratified**: validation-progress server-side persistence moves OUT of Wave B. Becomes compliance-W3 candidate if compliance pursues it. Wave B is pure HTTP observability.
+2. **Admin gating = tailnet-only** via Tailscale serve config. Rationale from Christian: *"I am the only one that wants to see this ever."* No public Funnel exposure of admin endpoints. Admin router on each satellite is configured to only respond on tailnet-routed requests (100.64.0.0/10 source IP check) until real Entra (W2) replaces this. If Christian moves to a non-tailnet machine, he'll Tailscale to view admin. This is the simplest possible answer given a single-viewer-ever posture.
+3. **Retention cap confirmed**: 100k entries OR 100MB per satellite, whichever first. Configurable per-satellite via env vars (`EPICORACLE_HTTP_LOG_MAX_ENTRIES`, `EPICORACLE_HTTP_LOG_MAX_BYTES`).
 
 ---
 
