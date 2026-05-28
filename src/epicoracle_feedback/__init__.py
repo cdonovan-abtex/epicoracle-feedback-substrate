@@ -21,6 +21,11 @@ from epicoracle_feedback.events import (
     emit_feedback_event,
     register_event_sink,
 )
+from epicoracle_feedback.http_events import (
+    HttpEvent,
+    emit_http_event,
+    register_http_event_sink,
+)
 from epicoracle_feedback.idempotency import check_idempotency
 from epicoracle_feedback.payload import (
     FeedbackDispatchResult,
@@ -28,7 +33,7 @@ from epicoracle_feedback.payload import (
     FeedbackPayload,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "DEFAULT_INBOX_PATH",
@@ -38,11 +43,14 @@ __all__ = [
     "FeedbackEvent",
     "FeedbackKind",
     "FeedbackPayload",
+    "HttpEvent",
     "__version__",
     "check_idempotency",
     "dispatch_feedback",
     "emit_feedback_event",
+    "emit_http_event",
     "register_event_sink",
+    "register_http_event_sink",
     "resolve_gh_token",
     "scan_for_credentials",
 ]

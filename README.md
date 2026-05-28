@@ -16,6 +16,22 @@ Operators submit feedback in-app. The substrate:
 
 Fail-soft: any failure between operator-submit and GitHub-issue lands in a JSONL inbox; a replay script drains the inbox idempotently when connectivity returns.
 
+## Features
+
+### Wave A — operator feedback
+
+- Fail-soft GitHub Issues dispatcher for in-app operator feedback.
+- Credential-pattern scanning before issue creation.
+- Feedback-domain event hook for satellite-native audit sinks.
+- Agent-dispatch workflow templates and path guards.
+
+### Wave B — HTTP observability
+
+- Pure ASGI HTTP request-log middleware with bounded queueing and fail-soft overflow.
+- Separate HTTP-domain event sink, independent of feedback-domain events.
+- SQLite WAL access-log store with indexed filters, cursor pagination, summaries, and hard retention caps.
+- Hardened admin access-log router with tenant scoping, role gating, tailnet-aware dev stub support, rate limiting, and audited reads.
+
 ## Why this exists
 
 Trinity-converged from the v2 brief (`02_Projects/EpicOracle Family/Operator Feedback Substrate — v2 Brief.md` in Christian's Obsidian vault). 10 BLOCKERs from Codex + Gemini critiques converged into the design captured here. Highlights:
