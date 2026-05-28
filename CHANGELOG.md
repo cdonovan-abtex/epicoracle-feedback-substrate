@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.0] - 2026-05-27
+
+### Added
+
+- Wave B HTTP observability substrate with a separate `HttpEvent` sink namespace.
+- Pure ASGI `HttpLoggingMiddleware` with bounded queueing, fail-soft overflow, route-template path capture, and static content-type exclusion.
+- SQLite WAL `SqliteAccessLogStore` with indexed filters, composite-cursor pagination, summaries, and hard retention caps.
+- Hardened `build_access_log_router` admin factory for tenant-scoped access-log reads and summaries.
+- Pydantic observability schemas with UTC timestamp validation and `extra="forbid"`.
+
+### Security
+
+- Admin access-log reads fail closed, require role gating, rate-limit per principal, and audit reads via the Wave A feedback-event sink.
+- Query strings and request/response bodies are never persisted in access-log entries.
+
 ## [v0.1.0] - 2026-05-25
 
 ### Added
