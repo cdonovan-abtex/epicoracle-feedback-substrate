@@ -1,6 +1,6 @@
 # Wave B — Observability Substrate
 
-**Version**: v2 (trinity-reconciled 2026-05-27).
+**Version**: v3 (Phase 4.5 amendment 2026-05-28, re-trinity on amendment scope).
 **Branch**: `feat/wB-observability-substrate` off `main`.
 **Goal**: Add a pure-observability primitive to the EpicOracle Family kit so every satellite can answer "who is hitting this surface, when, with what status" without forensics. Ships HTTP request-log middleware + an SQLite-backed access-log store + a hardened admin endpoint contract. Compliance's in-progress validation-state server-side persistence is **moved out of this wave** per Gemini's separation-of-concerns critique — it ships separately as a compliance-internal feature.
 
@@ -86,6 +86,101 @@ All three open questions resolved before dispatch. v2 build dispatched against t
 1. **Scope cut ratified**: validation-progress server-side persistence moves OUT of Wave B. Becomes compliance-W3 candidate if compliance pursues it. Wave B is pure HTTP observability.
 2. **Admin gating = tailnet-only** via Tailscale serve config. Rationale from Christian: *"I am the only one that wants to see this ever."* No public Funnel exposure of admin endpoints. Admin router on each satellite is configured to only respond on tailnet-routed requests (100.64.0.0/10 source IP check) until real Entra (W2) replaces this. If Christian moves to a non-tailnet machine, he'll Tailscale to view admin. This is the simplest possible answer given a single-viewer-ever posture.
 3. **Retention cap confirmed**: 100k entries OR 100MB per satellite, whichever first. Configurable per-satellite via env vars (`EPICORACLE_HTTP_LOG_MAX_ENTRIES`, `EPICORACLE_HTTP_LOG_MAX_BYTES`).
+
+---
+
+### v2 → v3 amendment notes (Phase 4.5, 2026-05-28)
+
+This amendment closes a gap the v2 brief left silent: **how do satellites reference the substrate as a Python dependency after Wave B ships?** The v2 dispatch prompt filled this gap with "use editable install of the worktree (`pip install -e ~/Developer/wB-worktrees/substrate`)" — an architectural choice introduced post-trinity. The Phase 5 build agent followed that instruction literally and committed `file://` refs to all 4 satellite/template branches, rendering them un-mergeable as-shipped.
+
+Christian named the pattern explicitly: *"Why are you introducing things after trinity? kind of defeats the purpose?"* and authorized a structural fix — the wave-lifecycle now has Phase 4.5 (pre-dispatch convergence) precisely to catch this class of drift before dispatch. See template `WAVE_LIFECYCLE.md` + `feedback_dispatch_prompt_is_mechanical_only` + `feedback_no_unilateral_architectural_decisions` + `feedback_correct_beats_quick`.
+
+The amendment decision (re-trinity'd at Phase 4.5):
+
+**Decision: Substrate dependency reference shape**
+
+Satellites and the template reference the substrate via git-tag URL:
+
+```
+"epicoracle-feedback @ git+https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git@v0.2.0"
+```
+
+Rationale:
+
+- **Matches existing template-main convention.** Template main today references the substrate as `git+https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git@v0.1.0` (Wave A). Wave B is a version bump on the same shape, not a new pattern.
+- **Portable to LLT and any other deploy target.** Installs from GitHub, not a Christian-MBP-specific filesystem path. Satellites become deployable from any host with internet access to GitHub.
+- **Semantic versioning preserved.** Tag-pinned ref is human-readable and aligns with the substrate's existing v0.1.0 → v0.2.0 progression. No PyPI publishing needed; no PyPI infrastructure to maintain.
+- **No new authentication requirements.** Public GitHub repo; no token or deploy key. Anyone with `git+https` install support (uv, pip, poetry) can resolve it.
+
+Affected files (satellite branches that need flipping from `file://` to the git+https form):
+
+- `epicoracle/backend/pyproject.toml` (hub) — `feat/wB-adopt-observability`
+- `epicoracle/backend/requirements.txt` (hub)
+- `epicoracle-marketplace/backend/pyproject.toml` (marketplace) — `feat/wB-adopt-observability`
+- `epicoracle-compliance/backend/pyproject.toml` (compliance) — `feat/wB-adopt-observability`
+- `epicoracle-satellite-template/backend/pyproject.toml` (template) — `feat/wB-inherit-observability`
+
+Phase ordering implication: the v0.2.0 git tag must exist on the substrate repo at GitHub BEFORE the satellite branches merge. Otherwise the new dep-ref points at a non-existent tag and `uv sync` fails.
+
+Updated Phase 7+8 sequence for Wave B:
+
+1. Push substrate `feat/wB-observability-substrate` → merge to substrate main → push main
+2. Tag substrate main as `v0.2.0` → push tag (Phase 8 — must precede satellite merges)
+3. Flip dep-ref in the 4 satellite/template branches from `file://` to `git+https://...@v0.2.0`
+4. Verify satellites resolve the new ref (`uv sync` clean) and tests still pass
+5. Push satellite/template feat branches → merge to each main
+
+**For waves after Wave B**: Phase 4.5 catches this class of issue before dispatch, not after. Future wave dispatch prompts get vetted as faithful translations of trinity-vetted briefs; brief amendments (with re-trinity if architectural) close gaps that surface during prompt-drafting.
+
+#### v3 trinity-lite reconciliation (Phase 4.5, 2026-05-28)
+
+The amendment was reviewed by Codex MCP (`gpt-5-codex`, implementation-correctness lens) and Gemini CLI (`gemini-3.1-pro-preview`, architectural-alternatives lens). Both verdicts: `minor_revisions`. Reconciliation calls below preserve reviewer attribution per `feedback_trinity_reconciles_artifacts`.
+
+**Convergent findings (both reviewers flagged — adopted):**
+
+1. **Tag protection mandate** *(Codex C-2 + Gemini C-2)* — Git tags can be deleted or moved unless protected at the host level. The `v0.2.0` substrate tag (and all future release tags) must be protected at GitHub via branch/tag protection rules: no force-push, no delete, no rewrite. Satellite lockfiles capture the resolved commit at install time, but the tag identity must remain stable for human auditability and clean dependency resolution.
+
+2. **Lockfile refresh discipline for future waves** *(Codex C-3 + Gemini C-3)* — Each future wave's version bump in adopting satellites must run `uv lock` (or equivalent) and commit the lockfile changes. Otherwise `pyproject.toml` bumps can be masked by stale lockfiles. Adding to future-wave checklist:
+
+   ```
+   For each adopting satellite per wave bump:
+   1. Verify substrate tag exists at GitHub and is protected
+   2. Update epicoracle-feedback dep ref to @vX.Y.Z in pyproject.toml + requirements.txt
+   3. Run `uv lock` (or equivalent) to refresh the lockfile
+   4. Commit lockfile + dep-ref together
+   5. Run satellite test suite
+   6. PR + merge
+   ```
+
+**Divergent finding — Claude reconciliation call (load-bearing, Gemini-only):**
+
+**Gemini C-1 (HIGH): CI friction for cross-repo development.** Gemini's concern: if satellite PRs run CI that does `uv sync`, but the dep ref is `@v0.2.0` and v0.2.0 hasn't been tagged yet, CI fails during development. The strict tag-before-merge ordering creates a cross-repo CI deadlock. Codex did not flag this; only Gemini caught it.
+
+- **Reconciliation**: the phase ORDERING is correct (Codex right — tag-before-merge is the right sequence for committed state). The WORKFLOW within that ordering needs explicit guidance (Gemini right — dev-time refs need a path that doesn't require the tag to exist yet).
+
+- **Resolution**: dev-time satellite branches MAY temporarily reference the substrate via branch name (`@feat/wB-observability-substrate`) or commit SHA (`@<sha>`) for local development and CI validation. **Before merge to satellite main**, the ref MUST be flipped to the immutable tag (`@v0.2.0`). The pre-merge tag-ref enforcement is the contract; the dev-time ref shape is flexible.
+
+  Practical sequence: (a) substrate work happens on `feat/wB-observability-substrate`, (b) satellite branches use `@feat/wB-observability-substrate` ref during local dev + initial CI validation, (c) substrate merges to main + gets tagged `v0.2.0`, (d) satellite branches flip refs from feat-branch to `@v0.2.0`, (e) re-run CI to validate against the immutable tag, (f) merge satellite branches.
+
+  This avoids the cross-repo CI deadlock without compromising the immutability of merged satellite state.
+
+**Divergent finding — Claude reconciliation call (Codex-only, narrow scope):**
+
+**Codex C-1 (LOW): Poetry syntax variant.** Codex notes that legacy Poetry projects (`[tool.poetry.dependencies]` table style) would express the dep differently:
+
+```toml
+epicoracle-feedback = { git = "https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git", tag = "v0.2.0" }
+```
+
+- **Reconciliation**: not applicable to current EpicOracle Family satellites — all use PEP 621 (`[project].dependencies` array) + uv as the resolver, where the proposed string form (`epicoracle-feedback @ git+https://...@v0.2.0`) is canonical. Codex's concern is noted for future-proofing if any satellite ever adopts Poetry layout, but Wave B requires no action.
+
+**Alternatives surfaced (out of scope for Wave B, recorded for future):**
+
+- **Commit SHA pinning** (both reviewers): maximally reproducible, weaker version-readability. Use the tag-ref form for Wave B per existing convention; SHA pinning available as an opt-in for satellites that need strict reproducibility (e.g., a customer pilot deployment).
+- **Private PyPI/package registry** (Gemini): cleaner long-term, but adds publishing infrastructure. Not in scope; revisit if substrate version cadence becomes high or if external operators need to consume the substrate.
+- **Automated dep-update tooling (Dependabot/Renovate)** (Gemini): reduces operator toil on version bumps. Worth adopting once substrate version cadence stabilizes; not in scope for Wave B.
+
+**Verdict on the amendment after reconciliation:** `accept` with the dev-time branch-ref workflow + tag-protection mandate + lockfile-refresh discipline folded in. Phase ordering remains correct.
 
 ---
 
