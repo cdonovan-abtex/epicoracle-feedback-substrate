@@ -75,6 +75,23 @@ def test_admin_non_tailnet_origin_denied(tmp_path) -> None:
     assert response.status_code == 403
 
 
+def test_admin_docker_bridge_origin_allowed(tmp_path) -> None:
+    # Per brief v3.1 amendment: Docker default bridge networking rewrites
+    # inbound source IPs to the bridge gateway (172.17.x.x or similar in
+    # 172.16.0.0/12). Admin requests that originated from a tailnet client
+    # arrive at the in-container code with a Docker-private source IP.
+    # That source range is RFC 1918 private (not internet-routable) so
+    # allowing it is safe.
+    store = SqliteAccessLogStore(tmp_path / "access_log.sqlite")
+    with TestClient(_app(store, Principal())) as client:
+        response = client.get(
+            "/admin/access-log/summary",
+            headers={"X-Forwarded-For": "172.17.0.1"},
+        )
+
+    assert response.status_code == 200
+
+
 def test_admin_tenant_leakage_denied(tmp_path) -> None:
     store = SqliteAccessLogStore(tmp_path / "access_log.sqlite")
     store.write_entry(_entry("other"))

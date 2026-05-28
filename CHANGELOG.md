@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.1] - 2026-05-28
+
+### Changed
+
+- `_is_localhost_or_tailnet` (admin router origin check) now also accepts the Docker default bridge subnet (`172.16.0.0/12`, RFC 1918 private). Docker's default bridge networking rewrites inbound source IPs to the bridge gateway, so an admin request that originated from a tailnet client arrives at the in-container code with a Docker-private source IP. Allowing this range is safe because RFC 1918 private addresses are not routable from the public internet; they only appear as source IPs when a request originates from a container on the same host. Surfaced when Wave B was deployed to the Dockerized hub on LLT and admin endpoint returned 403 from external tailnet clients. See Wave B brief v3.1 amendment.
+
+### Added
+
+- `test_admin_docker_bridge_origin_allowed` test (172.17.0.1 source → 200).
+
 ## [v0.2.0] - 2026-05-27
 
 ### Added

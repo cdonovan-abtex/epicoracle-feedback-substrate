@@ -26,6 +26,15 @@ LOCALHOSTS = {
     ipaddress.ip_address("127.0.0.1"),
     ipaddress.ip_address("::1"),
 }
+# Docker default bridge networks (RFC 1918 private). These addresses are
+# not routable from the public internet, so allowing them is safe — they
+# only appear as source IPs when a request originates from a container
+# on the same host. Wave B's deployment to the Dockerized hub on LLT
+# surfaced this: Docker's default bridge networking rewrites inbound
+# source IPs to the bridge gateway, so an admin request that originated
+# from a tailnet client appears to the in-container code as 172.17.x.x.
+# See brief v3.1 amendment.
+DOCKER_PRIVATE = ipaddress.ip_network("172.16.0.0/12")
 
 
 class InMemoryRateLimiter:
@@ -215,7 +224,7 @@ def _is_localhost_or_tailnet(ip_raw: str | None) -> bool:
         ip = ipaddress.ip_address(ip_raw)
     except ValueError:
         return False
-    return ip in LOCALHOSTS or ip in TAILNET
+    return ip in LOCALHOSTS or ip in TAILNET or ip in DOCKER_PRIVATE
 
 
 def _utc(value: datetime | None) -> datetime | None:

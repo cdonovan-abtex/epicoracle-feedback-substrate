@@ -1,6 +1,6 @@
 # Wave B — Observability Substrate
 
-**Version**: v3 (Phase 4.5 amendment 2026-05-28, re-trinity on amendment scope).
+**Version**: v3.1 (Docker-bridge admin-origin patch, 2026-05-28).
 **Branch**: `feat/wB-observability-substrate` off `main`.
 **Goal**: Add a pure-observability primitive to the EpicOracle Family kit so every satellite can answer "who is hitting this surface, when, with what status" without forensics. Ships HTTP request-log middleware + an SQLite-backed access-log store + a hardened admin endpoint contract. Compliance's in-progress validation-state server-side persistence is **moved out of this wave** per Gemini's separation-of-concerns critique — it ships separately as a compliance-internal feature.
 
@@ -181,6 +181,37 @@ epicoracle-feedback = { git = "https://github.com/cdonovan-abtex/epicoracle-feed
 - **Automated dep-update tooling (Dependabot/Renovate)** (Gemini): reduces operator toil on version bumps. Worth adopting once substrate version cadence stabilizes; not in scope for Wave B.
 
 **Verdict on the amendment after reconciliation:** `accept` with the dev-time branch-ref workflow + tag-protection mandate + lockfile-refresh discipline folded in. Phase ordering remains correct.
+
+#### v3 → v3.1 patch amendment (Docker-bridge admin origin, 2026-05-28)
+
+This amendment closes a gap that surfaced at Phase 10 LLT deploy: **the v2 brief's "tailnet-only" admin origin check (100.64.0.0/10 source IP) fails for the hub satellite because the hub runs in Docker.**
+
+Sequence of discovery:
+
+1. v2 brief defined the admin auth gate as "request source IP must be in localhost (127.0.0.1, ::1) or tailnet (100.64.0.0/10)."
+2. Marketplace + compliance satellites run as pm2-managed processes directly on the LLT host. Source IPs of inbound requests are preserved through to the satellite. Admin endpoint hits cleanly from external tailnet clients (verified Phase 10 — both returned HTTP 200 from MBP).
+3. **Hub runs in a Docker container.** Docker's default bridge networking with userland-proxy rewrites the source IP of inbound requests to the bridge gateway (typically `172.17.0.1` or another address in `172.16.0.0/12`). So the in-container hub backend sees `172.17.x.x` as the source IP for ALL inbound requests, regardless of the original client.
+4. Hub admin endpoint correctly fail-closed (403 "Admin route is tailnet-only") when hit from MBP via tailnet IP, because `172.17.0.1` is not in the tailnet range. Code did exactly what the brief specified; the brief just hadn't anticipated Docker's source-IP rewriting.
+
+**Decision (Christian, 2026-05-28, Phase 10 incident):** patch substrate `_is_localhost_or_tailnet` to ALSO accept the Docker default bridge subnet (`172.16.0.0/12`). Tag substrate `v0.2.1`. Redeploy hub against the new ref. Marketplace + compliance also benefit from the additional CIDR but were already working pre-patch.
+
+**Why this is safe:**
+
+- `172.16.0.0/12` is **RFC 1918 private** — these addresses are not routable from the public internet. They can ONLY appear as source IPs when a request originates from a process on the same host (or a host in the same private network).
+- For a Funnel-exposed satellite, traffic from the public internet enters via Tailscale Funnel ingress and gets routed to the local satellite. If the satellite runs in Docker, Docker's source-IP rewriting maps the public-internet source to the bridge gateway, NOT to a public IP. So accepting `172.16.0.0/12` does not open admin endpoints to the public internet — the public traffic always gets terminated by the frontend (which doesn't proxy admin paths) before reaching the backend.
+- For a non-Funnel-exposed admin endpoint reached directly via the backend port (e.g., `100.92.108.122:3001/admin/...`), the source-IP rewriting still happens at the Docker layer, but only for requests that ACTUALLY originate from a Docker-private network. There is no path by which a public-internet client can produce a `172.16.0.0/12` source IP at the in-container code.
+
+**Why this isn't trinity-vetted** (per `feedback_blast_radius_review_tier`): single-line extension to an existing CIDR check (narrow design space + existing pattern + no new architectural decision class). Test added; brief amendment documents the decision; substrate patch tagged as v0.2.1 (semver patch bump per the change being non-breaking).
+
+**Affected files:**
+
+- `src/epicoracle_feedback/admin_router.py` — added `DOCKER_PRIVATE = ipaddress.ip_network("172.16.0.0/12")` constant + `or ip in DOCKER_PRIVATE` to `_is_localhost_or_tailnet`
+- `tests/test_admin_router.py` — added `test_admin_docker_bridge_origin_allowed`
+- `pyproject.toml` — bumped to 0.2.1
+- `CHANGELOG.md` — v0.2.1 entry
+- Hub satellite — `epicoracle-feedback` ref bumped from `@v0.2.0` to `@v0.2.1`
+
+Marketplace + compliance refs deliberately NOT bumped at this patch — they're not affected by the Docker constraint and a separate bump for them just to take the same dep version is operator overhead with no functional benefit. They pick up v0.2.1 on the next wave's dep bump per [[feedback_correct_beats_quick]] discipline.
 
 ---
 
