@@ -1,6 +1,6 @@
 # Wave B — Observability Substrate
 
-**Version**: v3.1 (Docker-bridge admin-origin patch, 2026-05-28).
+**Version**: v3.2 (Phase 10 synthetic-admin gap documented + deferred, 2026-05-28).
 **Branch**: `feat/wB-observability-substrate` off `main`.
 **Goal**: Add a pure-observability primitive to the EpicOracle Family kit so every satellite can answer "who is hitting this surface, when, with what status" without forensics. Ships HTTP request-log middleware + an SQLite-backed access-log store + a hardened admin endpoint contract. Compliance's in-progress validation-state server-side persistence is **moved out of this wave** per Gemini's separation-of-concerns critique — it ships separately as a compliance-internal feature.
 
@@ -212,6 +212,39 @@ Sequence of discovery:
 - Hub satellite — `epicoracle-feedback` ref bumped from `@v0.2.0` to `@v0.2.1`
 
 Marketplace + compliance refs deliberately NOT bumped at this patch — they're not affected by the Docker constraint and a separate bump for them just to take the same dep version is operator overhead with no functional benefit. They pick up v0.2.1 on the next wave's dep bump per [[feedback_correct_beats_quick]] discipline.
+
+#### v3.2 — Phase 10 finding: synthetic-admin auth gap on marketplace + compliance (deferred to production hardening, 2026-05-28)
+
+While verifying Phase 10 deploys, surfaced that **marketplace + compliance admin endpoints accept any tailnet-source request as authorized admin**, without requiring credentials.
+
+Root cause chain:
+
+1. Both satellites' `_auth_enabled()` reads an env var (`EPICORACLE_MARKETPLACE_AUTH_ENABLED`, `EPICORACLE_COMPLIANCE_AUTH_ENABLED`). Both are `false` on LLT.
+2. When auth is disabled, `get_principal(request)` returns `_synthetic_principal()` — a hardcoded dev-mode user with `SYNTHETIC_ROLES = (ROLE_OPERATOR, ROLE_ADMIN)`. Synthetic admin role is granted regardless of any credential.
+3. The substrate's admin router checks `_has_admin_role(principal)`. Synthetic principal passes this check (`ROLE_ADMIN` is present). Router has no way to distinguish synthetic from real principals — it only sees the roles.
+4. Net effect: admin endpoints on marketplace + compliance return 200 to any tailnet request, no credentials needed. The auth identity gate is effectively pass-through; only the network/tailnet gate is enforced.
+
+Hub does NOT have this — its `_role_gate` (`resolve_admin_principal(Authorization, X-User-Role)`) returns None for unauthenticated requests, so the auth gate is real fail-closed.
+
+**The v2 brief assumed** the satellite's `role_gate` would return None for unauthenticated requests. Two of three current satellites synthesize an admin instead.
+
+**Decision (Christian, 2026-05-28, Phase 10):** accept the gap on marketplace + compliance for the current staging-tier posture. Defer hardening to when EpicOracle moves off Tailscale Funnel to its production-tier hosting (Beast Linux server, `epicoracle.abtex.com` or similar).
+
+**Why this is acceptable for the staging tier:**
+
+- The synthetic-admin behavior only fires for requests that reach the satellite's BACKEND port (3001 / 8001 / 8002 directly). External operators (John, Dan, anyone with the public Funnel URL) only have the public `https://` links — those route to FRONTENDS, which don't proxy admin paths. So admin endpoints are NOT reachable from public internet at all.
+- Tailnet access is currently single-operator (Christian only — verified `tailscale status` 2026-05-28). Synthetic-admin-on-tailnet is functionally equivalent to "Christian only" since no other tailnet member exists.
+- Even if a tailnet member were added (Vanessa, Josh) in the staging tier, the admin endpoint exposes read-only access-log data; no write surfaces, no destructive operations. Risk surface is limited to "another tailnet member could view who's hit which routes," not "another tailnet member could modify state."
+
+**Production-hardening punch list (when Beast deploys + Tailscale Funnel retires):**
+
+- [ ] Enable `EPICORACLE_MARKETPLACE_AUTH_ENABLED=true` + Entra app registration + bearer token validation
+- [ ] Enable `EPICORACLE_COMPLIANCE_AUTH_ENABLED=true` + same
+- [ ] Verify both satellites' `get_principal` paths require real auth headers and 401 (not 200 + synthetic) when unauthenticated
+- [ ] Verify admin endpoints on both satellites return 403 (not 200) for unauthenticated requests after auth is enabled
+- [ ] Optionally: substrate v0.x.y patch to refuse `principal.is_synthetic=True` in `_has_admin_role` (defense in depth — even if a satellite forgets to enable auth, admin endpoints still fail closed). Single-line patch, deferred to whenever this list activates.
+
+**Why not patch substrate now**: per [[feedback_correct_beats_quick]] + [[feedback_blast_radius_review_tier]] — the staging tier is functionally safe right now, the operator deferred to a known future hardening point (Beast deploy), and patching now creates v0.2.2 + flip-all-satellites churn for zero current-state risk reduction. The fix belongs in the production-tier transition, not as a Wave B follow-on.
 
 ---
 
