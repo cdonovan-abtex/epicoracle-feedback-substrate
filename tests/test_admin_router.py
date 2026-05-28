@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -32,9 +32,12 @@ def _app(store: SqliteAccessLogStore, principal: Principal | None) -> FastAPI:
 
 
 def _entry(tenant: str) -> AccessLogEntry:
+    # Use a relative timestamp inside the summary endpoint's default 24h
+    # lookback window so the test stays green over time. A hardcoded date
+    # rots out of the window within a day.
     return AccessLogEntry(
         correlation_id=f"corr-{tenant}",
-        timestamp_utc=datetime(2026, 5, 27, 12, 0, tzinfo=UTC),
+        timestamp_utc=datetime.now(UTC) - timedelta(minutes=5),
         principal="operator@example.test",
         method="GET",
         route_template="/health",
