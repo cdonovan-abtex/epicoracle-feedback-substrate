@@ -10,5 +10,4 @@
 # Pinned versions: bump intentionally; substrate release + CHANGELOG.
 
 anthropic>=0.40,<1.0
-openai>=1.50,<2.0              # fix_pr.py + trinity_dispatch.py (Codex side)
-google-genai>=1.0,<2.0         # trinity_dispatch.py (Gemini side)
+openai>=1.50,<2.0              # fix_pr.py + trinity_dispatch.py (Codex side, Responses API)

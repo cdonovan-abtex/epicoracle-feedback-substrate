@@ -1,15 +1,22 @@
 """Tests for scripts/agent-dispatch/trinity_dispatch.py.
 
-Mocks the OpenAI + Google + Anthropic clients so tests are fast,
-deterministic, and don't touch real APIs.
+As of v0.2.2 the script implements a 2-voice review: Codex structured
+critique (via the OpenAI Responses API) + Claude reconciliation. The
+file is still named ``trinity_dispatch.py`` because the triage
+classifier routes by the ``"trinity"`` key and renaming would force
+consuming workflows to update.
+
+Mocks the OpenAI + Anthropic clients so tests are fast, deterministic,
+and don't touch real APIs.
 
 Coverage:
   - graceful skip when CODEX_API_KEY or ANTHROPIC_API_KEY unset
   - non-suggestion kind bails to human
   - reconciliation rendering: convergent + divergent + next-steps sections
-  - half-trinity fallback: Gemini failure produces synthetic sidecar so
-    reconciler still runs
-  - full failure paths (Codex fails entirely, reconciler fails)
+  - failure paths (Codex fails, reconciler fails)
+  - happy path
+  - _run_codex uses the Responses API shape (text_format=, input=,
+    max_output_tokens=, output_parsed)
 """
 
 from __future__ import annotations
@@ -17,7 +24,8 @@ from __future__ import annotations
 import json
 import pathlib
 import sys
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -54,7 +62,6 @@ def suggestion_env(monkeypatch):
     )
     monkeypatch.setenv("CODEX_API_KEY", "sk-test")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
-    monkeypatch.setenv("GEMINI_API_KEY", "g-test")
     monkeypatch.setenv("ISSUE_NUMBER", "21")
     monkeypatch.setenv("GITHUB_REPOSITORY", "cdonovan-abtex/epicoracle")
     monkeypatch.setenv("ISSUE_TITLE", "[hub][suggestion] Satellites tab")
@@ -75,31 +82,17 @@ def _codex_critique() -> dict:
     }
 
 
-def _gemini_critique() -> dict:
-    return {
-        "reviewer": "gemini",
-        "recommendation": "iterate",
-        "summary": "Operator value depends on what KPIs land.",
-        "pros": ["Operator-asked-for", "Hub becomes ops dashboard"],
-        "cons": ["Designing the KPI cards is the hard part"],
-        "implementation_sketch": "Start with just health pings; add metrics later.",
-        "risks": ["Scope creep into a full BI tool"],
-        "open_questions": ["Which metrics matter most to Vanessa?"],
-        "confidence": "medium",
-    }
-
-
 def _reconciliation() -> dict:
     return {
         "convergent_points": [
-            "Both agree the underlying capability is doable",
-            "Both flagged design tension around KPI selection",
+            "Codex's implementation sketch matches the operator's ask",
+            "Both noted KPI selection is the harder design problem",
         ],
         "divergent_points": [
             {
                 "topic": "Initial scope",
                 "codex_view": "Ship the polling layer first",
-                "gemini_view": "Don't ship without KPI clarity",
+                "claude_view": "Don't ship without KPI clarity",
             }
         ],
         "unified_recommendation": "iterate",
@@ -188,22 +181,25 @@ def test_render_includes_convergent_divergent_next_steps_questions():
     rendered = trinity_dispatch._render_reconciliation_comment(
         _reconciliation(),
         codex_recommendation="iterate",
-        gemini_recommendation="iterate",
         codex_model="codex-test",
-        gemini_model="gemini-test",
         reconciler_model="claude-test",
         submission_id="abc-123",
     )
+    assert "Review analysis" in rendered
     assert "Unified recommendation" in rendered
     assert "iterate" in rendered
-    assert "Both critiques converged on" in rendered
-    assert "Where the critiques diverged" in rendered
+    assert "converged" in rendered
+    assert "diverged" in rendered
     assert "Initial scope" in rendered
     assert "Next steps" in rendered
     assert "[ ] Christian + Vanessa pick 3 KPIs" in rendered
     assert "Open questions for Christian" in rendered
     assert "Which 3 KPIs" in rendered
     assert "Submission `abc-123`" in rendered
+    # Two-voice attribution — Codex + Claude, no Gemini.
+    assert "Codex" in rendered
+    assert "Claude" in rendered
+    assert "Gemini" not in rendered
 
 
 def test_render_handles_empty_divergent_section():
@@ -212,11 +208,10 @@ def test_render_handles_empty_divergent_section():
     rendered = trinity_dispatch._render_reconciliation_comment(
         rec,
         codex_recommendation="build",
-        gemini_recommendation="build",
-        codex_model="c", gemini_model="g", reconciler_model="r",
+        codex_model="c", reconciler_model="r",
         submission_id="x",
     )
-    assert "Where the critiques diverged" not in rendered
+    assert "diverged" not in rendered
 
 
 def test_render_recommendation_emojis():
@@ -230,54 +225,74 @@ def test_render_recommendation_emojis():
         rec["unified_recommendation"] = rec_value
         rendered = trinity_dispatch._render_reconciliation_comment(
             rec,
-            codex_recommendation="x", gemini_recommendation="x",
-            codex_model="c", gemini_model="g", reconciler_model="r",
+            codex_recommendation="x",
+            codex_model="c", reconciler_model="r",
             submission_id="x",
         )
         assert emoji in rendered
 
 
 # ---------------------------------------------------------------------------
-# Half-trinity fallback (Gemini failure / unavailable)
+# _run_codex — Responses API shape verification
 # ---------------------------------------------------------------------------
 
 
-def test_half_trinity_when_gemini_unavailable(suggestion_env, monkeypatch):
-    """If GEMINI_API_KEY isn't set, Codex runs alone + reconciler still fires
-    with a synthetic Gemini sidecar noting half-trinity."""
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+def test_run_codex_uses_responses_api_shape():
+    """Pin the Responses API call shape: input=, text_format=,
+    max_output_tokens=, and parsed via response.output_parsed. This is the
+    contract gpt-5-codex requires; chat.completions.parse 404s for that
+    model."""
+    fake_parsed_obj = MagicMock()
+    fake_parsed_obj.model_dump.return_value = _codex_critique()
+    fake_response = SimpleNamespace(output_parsed=fake_parsed_obj)
 
-    posted: list[str] = []
-    transitions: list[str] = []
+    fake_client = MagicMock()
+    fake_client.responses.parse.return_value = fake_response
 
-    import importlib  # noqa: PLC0415
-    importlib.reload(trinity_dispatch)
-    with (
-        patch("trinity_dispatch._run_codex", return_value=_codex_critique()),
-        patch("trinity_dispatch._run_gemini", return_value=None) as gemini_mock,
-        patch("trinity_dispatch._run_reconciler", return_value=_reconciliation()),
-        patch(
-            "trinity_dispatch.comment_on_issue",
-            side_effect=lambda n, r, b: posted.append(b) or True,
-        ),
-        patch(
-            "trinity_dispatch.transition_status",
-            side_effect=lambda **kw: transitions.append(kw["to_label"]),
-        ),
-    ):
-        rc = trinity_dispatch.main()
+    fake_openai_module = MagicMock()
+    fake_openai_module.OpenAI.return_value = fake_client
+    fake_openai_module.OpenAIError = Exception
 
-    assert rc == 0
-    # Gemini not called when key absent
-    gemini_mock.assert_not_called()
-    # Reconciliation comment posted
-    assert len(posted) >= 1
-    assert "Trinity analysis" in posted[0]
-    assert "agent/status:fix-ready" in transitions
+    with patch.dict(sys.modules, {"openai": fake_openai_module}):
+        out = trinity_dispatch._run_codex(
+            user_message="hello",
+            model="gpt-5-codex",
+            api_key="sk-test",
+        )
+
+    assert out == _codex_critique()
+    # Verify the call shape — these kwargs are the fix for the 404.
+    assert fake_client.responses.parse.called
+    call_kwargs = fake_client.responses.parse.call_args.kwargs
+    assert call_kwargs["model"] == "gpt-5-codex"
+    assert "input" in call_kwargs and isinstance(call_kwargs["input"], list)
+    assert call_kwargs["input"][0]["role"] == "system"
+    assert call_kwargs["input"][1]["role"] == "user"
+    assert "text_format" in call_kwargs  # NOT response_format
+    assert "max_output_tokens" in call_kwargs  # NOT max_completion_tokens
+    assert "response_format" not in call_kwargs
+    assert "max_completion_tokens" not in call_kwargs
+    assert "messages" not in call_kwargs
+
+
+def test_run_codex_returns_none_when_output_parsed_is_none():
+    fake_response = SimpleNamespace(output_parsed=None)
+    fake_client = MagicMock()
+    fake_client.responses.parse.return_value = fake_response
+
+    fake_openai_module = MagicMock()
+    fake_openai_module.OpenAI.return_value = fake_client
+    fake_openai_module.OpenAIError = Exception
+
+    with patch.dict(sys.modules, {"openai": fake_openai_module}):
+        out = trinity_dispatch._run_codex(
+            user_message="hi", model="gpt-5-codex", api_key="sk",
+        )
+    assert out is None
 
 
 # ---------------------------------------------------------------------------
-# Codex failure path
+# Codex / reconciler failure paths
 # ---------------------------------------------------------------------------
 
 
@@ -289,7 +304,6 @@ def test_codex_failure_bails_to_human(suggestion_env):
     importlib.reload(trinity_dispatch)
     with (
         patch("trinity_dispatch._run_codex", return_value=None),
-        patch("trinity_dispatch._run_gemini", return_value=_gemini_critique()),
         patch("trinity_dispatch._run_reconciler") as recon_mock,
         patch("trinity_dispatch.comment_on_issue",
               side_effect=lambda n, r, b: posted.append(b) or True),
@@ -301,6 +315,8 @@ def test_codex_failure_bails_to_human(suggestion_env):
     assert rc == 0
     recon_mock.assert_not_called()  # don't reconcile if Codex failed
     assert any("Codex side failed" in c for c in posted)
+    # Bail message now uses "review-dispatch" framing, not "trinity".
+    assert any("review-dispatch" in c for c in posted)
     assert "agent/status:needs-human" in transitions
 
 
@@ -312,7 +328,6 @@ def test_reconciler_failure_bails_to_human(suggestion_env):
     importlib.reload(trinity_dispatch)
     with (
         patch("trinity_dispatch._run_codex", return_value=_codex_critique()),
-        patch("trinity_dispatch._run_gemini", return_value=_gemini_critique()),
         patch("trinity_dispatch._run_reconciler", return_value=None),
         patch("trinity_dispatch.comment_on_issue",
               side_effect=lambda n, r, b: posted.append(b) or True),
@@ -327,7 +342,7 @@ def test_reconciler_failure_bails_to_human(suggestion_env):
 
 
 # ---------------------------------------------------------------------------
-# Happy path (full trinity)
+# Happy path (2-voice review)
 # ---------------------------------------------------------------------------
 
 
@@ -341,7 +356,6 @@ def test_happy_path_posts_reconciliation_and_transitions_to_fix_ready(
     importlib.reload(trinity_dispatch)
     with (
         patch("trinity_dispatch._run_codex", return_value=_codex_critique()),
-        patch("trinity_dispatch._run_gemini", return_value=_gemini_critique()),
         patch("trinity_dispatch._run_reconciler", return_value=_reconciliation()),
         patch("trinity_dispatch.comment_on_issue",
               side_effect=lambda n, r, b: posted.append(b) or True),
@@ -353,10 +367,37 @@ def test_happy_path_posts_reconciliation_and_transitions_to_fix_ready(
     assert rc == 0
     assert len(posted) == 1
     body = posted[0]
-    assert "Trinity analysis" in body
+    assert "Review analysis" in body
     assert "Unified recommendation" in body
     assert "iterate" in body  # from _reconciliation()
     assert "Codex" in body
-    assert "Gemini" in body
+    assert "Claude" in body
+    assert "Gemini" not in body
     assert "agent/status:processing" in transitions
     assert "agent/status:fix-ready" in transitions
+
+
+# ---------------------------------------------------------------------------
+# Reconciler message no longer references Gemini
+# ---------------------------------------------------------------------------
+
+
+def test_reconciler_message_omits_gemini():
+    """The reconciler message contains operator content + Codex's critique
+    only. No Gemini section."""
+    body = (
+        "> _data_\n```\nsomething\n```\n\n---\n**Context**\n\n"
+        "<!-- MACHINE-READABLE -->\n```json\n"
+        + json.dumps({
+            "submission_id": "s", "correlation_id": "c", "kind": "suggestion",
+            "route_path": "/x", "satellite": "hub", "satellite_version": "0.1.0",
+        }) + "\n```\n"
+    )
+    parsed = trinity_dispatch.parse_issue_body(body)
+    msg = trinity_dispatch._build_reconciler_message(
+        issue_title="[hub][suggestion] Foo",
+        parsed=parsed,
+        codex_critique=_codex_critique(),
+    )
+    assert "Codex critique" in msg
+    assert "Gemini" not in msg
