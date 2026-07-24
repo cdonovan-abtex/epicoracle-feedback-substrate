@@ -409,8 +409,8 @@ def dispatch_feedback(  # noqa: PLR0911  -- many early-return failure modes by d
             reason=f"gh exit {completed.returncode}: {stderr_tail[0]}",
         )
 
-    issue_url, issue_number = _parse_issue_url(completed.stdout or "")
-    if issue_url is None or issue_number is None:
+    parsed_issue_url, issue_number = _parse_issue_url(completed.stdout or "")
+    if parsed_issue_url is None or issue_number is None:
         return _fallback(
             payload=payload,
             inbox_path=inbox,
@@ -421,10 +421,10 @@ def dispatch_feedback(  # noqa: PLR0911  -- many early-return failure modes by d
     _emit(
         "feedback.issue_created",
         payload,
-        {"issue_number": issue_number, "issue_url": issue_url},
+        {"issue_number": issue_number, "issue_url": parsed_issue_url},
     )
     return FeedbackDispatchResult(
-        issue_url=issue_url,
+        issue_url=parsed_issue_url,
         issue_number=issue_number,
         queued_offline=False,
         captured_at=server_timestamp,
