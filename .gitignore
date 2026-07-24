@@ -21,7 +21,6 @@ ENV/
 
 # uv
 .uv/
-uv.lock
 
 # Test / type-check artifacts
 .pytest_cache/
