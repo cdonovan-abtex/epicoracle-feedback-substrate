@@ -10,9 +10,9 @@ Wave B is the natural extension of Wave A. Wave A shipped `events.py` (`Feedback
 
 ## Why this wave lands now
 
-The 2026-05-27 working session surfaced a load-bearing operational gap: three satellites (hub, marketplace, compliance) are deployed to LLT via Tailscale Funnel and serving live traffic. Christian sent the compliance URL to John Chesnes (the eventual operator) and inadvertently to Dan Kirtz (COO). Dan visited; whether John has touched it is unknowable today. The investigation that surfaced the gap took ~30 minutes of forensics (nginx config, Tailscale serve status, GitHub issue history, codebase greps) — exactly the kind of question the substrate should answer in 5 seconds.
+The 2026-05-27 working session surfaced a load-bearing operational gap: three satellites (hub, marketplace, compliance) are deployed to LLT via Tailscale Funnel and serving live traffic. The product owner sent the compliance URL to the eventual compliance operator and inadvertently to the COO. The COO visited; whether the compliance operator has touched it is unknowable today. The investigation that surfaced the gap took ~30 minutes of forensics (nginx config, Tailscale serve status, GitHub issue history, codebase greps) — exactly the kind of question the substrate should answer in 5 seconds.
 
-The cost of NOT shipping it is paid every time the operator needs to answer "is anyone hitting this" and has to do forensics — and more importantly, paid in trust when an operator (John) is given access and we can't tell whether he's engaged or not.
+The cost of NOT shipping it is paid every time the operator needs to answer "is anyone hitting this" and has to do forensics — and more importantly, paid in trust when a compliance operator is given access and we can't tell whether that operator is engaged.
 
 Composes with existing memory:
 - [[reference_secrets_storage_pattern]] — observability data is sensitivity-classified per the same model
@@ -59,7 +59,7 @@ Trinity-vet ran 2026-05-27 13:00 EDT. Codex MCP critique (implementation-correct
 **D-5: Validation-progress server-side persistence — SCOPE CUT** — *Codex (Q5): hybrid (substrate owns schemas/helpers, satellite owns persistence). Gemini (B-1, Q5): entirely owned by compliance satellite, OUT of substrate.*
 - **Call: validation-progress is moved OUT of Wave B entirely. Wave B is pure HTTP observability.**
 - **Reasoning**: Gemini's separation-of-concerns argument is structurally correct — validation progress is application domain state for compliance, not cross-cutting infrastructure. Bundling them couples the substrate to compliance-specific logic and violates the substrate's generic nature. Codex's hybrid would still have the substrate "managing" the schema for a single-consumer domain feature, which is premature abstraction.
-- **This is a scope change from Christian's authorized v1 scope (A — single wave including validation-progress). Surfacing for ratification at Phase 4.** Compliance's validation-progress persistence becomes a separate compliance-internal wave (compliance-W3 candidate).
+- **This is a scope change from the product owner's authorized v1 scope (A — single wave including validation-progress). Surfacing for ratification at Phase 4.** Compliance's validation-progress persistence becomes a separate compliance-internal wave (compliance-W3 candidate).
 
 ### Unilateral findings — Codex only (absorbed into v2)
 
@@ -79,12 +79,12 @@ Trinity-vet ran 2026-05-27 13:00 EDT. Codex MCP critique (implementation-correct
 - **B-1 domain/infrastructure conflation** → resolved by D-5 (validation-progress moved out)
 - **OQ-2 static-asset exclusion fragility** → middleware default excludes by **response Content-Type** (`image/*`, `text/css`, `application/javascript`, etc.) rather than path patterns. Path patterns remain as supplementary configurable override. Framework-agnostic.
 
-### Phase 4 ratifications (Christian, 2026-05-27 13:25 EDT)
+### Phase 4 ratifications (product owner, 2026-05-27 13:25 EDT)
 
 All three open questions resolved before dispatch. v2 build dispatched against these decisions.
 
 1. **Scope cut ratified**: validation-progress server-side persistence moves OUT of Wave B. Becomes compliance-W3 candidate if compliance pursues it. Wave B is pure HTTP observability.
-2. **Admin gating = tailnet-only** via Tailscale serve config. Rationale from Christian: *"I am the only one that wants to see this ever."* No public Funnel exposure of admin endpoints. Admin router on each satellite is configured to only respond on tailnet-routed requests (100.64.0.0/10 source IP check) until real Entra (W2) replaces this. If Christian moves to a non-tailnet machine, he'll Tailscale to view admin. This is the simplest possible answer given a single-viewer-ever posture.
+2. **Admin gating = tailnet-only** via Tailscale serve config. Rationale from the product owner: *"I am the only one that wants to see this ever."* No public Funnel exposure of admin endpoints. Admin router on each satellite is configured to only respond on tailnet-routed requests (100.64.0.0/10 source IP check) until real Entra (W2) replaces this. If the product owner moves to a non-tailnet machine, they will use Tailscale to view admin. This is the simplest possible answer given a single-viewer-ever posture.
 3. **Retention cap confirmed**: 100k entries OR 100MB per satellite, whichever first. Configurable per-satellite via env vars (`EPICORACLE_HTTP_LOG_MAX_ENTRIES`, `EPICORACLE_HTTP_LOG_MAX_BYTES`).
 
 ---
@@ -93,7 +93,7 @@ All three open questions resolved before dispatch. v2 build dispatched against t
 
 This amendment closes a gap the v2 brief left silent: **how do satellites reference the substrate as a Python dependency after Wave B ships?** The v2 dispatch prompt filled this gap with "use editable install of the worktree (`pip install -e ~/Developer/wB-worktrees/substrate`)" — an architectural choice introduced post-trinity. The Phase 5 build agent followed that instruction literally and committed `file://` refs to all 4 satellite/template branches, rendering them un-mergeable as-shipped.
 
-Christian named the pattern explicitly: *"Why are you introducing things after trinity? kind of defeats the purpose?"* and authorized a structural fix — the wave-lifecycle now has Phase 4.5 (pre-dispatch convergence) precisely to catch this class of drift before dispatch. See template `WAVE_LIFECYCLE.md` + `feedback_dispatch_prompt_is_mechanical_only` + `feedback_no_unilateral_architectural_decisions` + `feedback_correct_beats_quick`.
+The product owner named the pattern explicitly: *"Why are you introducing things after trinity? kind of defeats the purpose?"* and authorized a structural fix — the wave-lifecycle now has Phase 4.5 (pre-dispatch convergence) precisely to catch this class of drift before dispatch. See template `WAVE_LIFECYCLE.md` + `feedback_dispatch_prompt_is_mechanical_only` + `feedback_no_unilateral_architectural_decisions` + `feedback_correct_beats_quick`.
 
 The amendment decision (re-trinity'd at Phase 4.5):
 
@@ -108,7 +108,7 @@ Satellites and the template reference the substrate via git-tag URL:
 Rationale:
 
 - **Matches existing template-main convention.** Template main today references the substrate as `git+https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git@v0.1.0` (Wave A). Wave B is a version bump on the same shape, not a new pattern.
-- **Portable to LLT and any other deploy target.** Installs from GitHub, not a Christian-MBP-specific filesystem path. Satellites become deployable from any host with internet access to GitHub.
+- **Portable to LLT and any other deploy target.** Installs from GitHub, not a product-owner-workstation-specific filesystem path. Satellites become deployable from any host with internet access to GitHub.
 - **Semantic versioning preserved.** Tag-pinned ref is human-readable and aligns with the substrate's existing v0.1.0 → v0.2.0 progression. No PyPI publishing needed; no PyPI infrastructure to maintain.
 - **No new authentication requirements.** Public GitHub repo; no token or deploy key. Anyone with `git+https` install support (uv, pip, poetry) can resolve it.
 
@@ -193,7 +193,7 @@ Sequence of discovery:
 3. **Hub runs in a Docker container.** Docker's default bridge networking with userland-proxy rewrites the source IP of inbound requests to the bridge gateway (typically `172.17.0.1` or another address in `172.16.0.0/12`). So the in-container hub backend sees `172.17.x.x` as the source IP for ALL inbound requests, regardless of the original client.
 4. Hub admin endpoint correctly fail-closed (403 "Admin route is tailnet-only") when hit from MBP via tailnet IP, because `172.17.0.1` is not in the tailnet range. Code did exactly what the brief specified; the brief just hadn't anticipated Docker's source-IP rewriting.
 
-**Decision (Christian, 2026-05-28, Phase 10 incident):** patch substrate `_is_localhost_or_tailnet` to ALSO accept the Docker default bridge subnet (`172.16.0.0/12`). Tag substrate `v0.2.1`. Redeploy hub against the new ref. Marketplace + compliance also benefit from the additional CIDR but were already working pre-patch.
+**Decision (product owner, 2026-05-28, Phase 10 incident):** patch substrate `_is_localhost_or_tailnet` to ALSO accept the Docker default bridge subnet (`172.16.0.0/12`). Tag substrate `v0.2.1`. Redeploy hub against the new ref. Marketplace + compliance also benefit from the additional CIDR but were already working pre-patch.
 
 **Why this is safe:**
 
@@ -228,13 +228,13 @@ Hub does NOT have this — its `_role_gate` (`resolve_admin_principal(Authorizat
 
 **The v2 brief assumed** the satellite's `role_gate` would return None for unauthenticated requests. Two of three current satellites synthesize an admin instead.
 
-**Decision (Christian, 2026-05-28, Phase 10):** accept the gap on marketplace + compliance for the current staging-tier posture. Defer hardening to when EpicOracle moves off Tailscale Funnel to its production-tier hosting (Beast Linux server, `epicoracle.abtex.com` or similar).
+**Decision (product owner, 2026-05-28, Phase 10):** accept the gap on marketplace + compliance for the current staging-tier posture. Defer hardening to when EpicOracle moves off Tailscale Funnel to its production-tier hosting (Beast Linux server, `epicoracle.abtex.com` or similar).
 
 **Why this is acceptable for the staging tier:**
 
-- The synthetic-admin behavior only fires for requests that reach the satellite's BACKEND port (3001 / 8001 / 8002 directly). External operators (John, Dan, anyone with the public Funnel URL) only have the public `https://` links — those route to FRONTENDS, which don't proxy admin paths. So admin endpoints are NOT reachable from public internet at all.
-- Tailnet access is currently single-operator (Christian only — verified `tailscale status` 2026-05-28). Synthetic-admin-on-tailnet is functionally equivalent to "Christian only" since no other tailnet member exists.
-- Even if a tailnet member were added (Vanessa, Josh) in the staging tier, the admin endpoint exposes read-only access-log data; no write surfaces, no destructive operations. Risk surface is limited to "another tailnet member could view who's hit which routes," not "another tailnet member could modify state."
+- The synthetic-admin behavior only fires for requests that reach the satellite's BACKEND port (3001 / 8001 / 8002 directly). External operators (the compliance operator, the COO, or anyone with the public Funnel URL) only have the public `https://` links — those route to FRONTENDS, which don't proxy admin paths. So admin endpoints are NOT reachable from public internet at all.
+- Tailnet access is currently single-operator (the product owner only — verified `tailscale status` 2026-05-28). Synthetic-admin-on-tailnet is functionally equivalent to "product owner only" since no other tailnet member exists.
+- Even if another marketplace or sales operator were added to the tailnet in the staging tier, the admin endpoint exposes read-only access-log data; no write surfaces, no destructive operations. Risk surface is limited to "another tailnet member could view who's hit which routes," not "another tailnet member could modify state."
 
 **Production-hardening punch list (when Beast deploys + Tailscale Funnel retires):**
 
@@ -274,7 +274,7 @@ Per [[feedback_pre_brief_discovery]]. Conducted 2026-05-27 12:30 EDT.
 - **Excluded from commit**: Per-satellite SQLite access-log DBs (`data/access_log.sqlite`) gitignored.
 
 ### Operator question this wave answers
-- **Real operator decision**: *"Is John (or any specific user) actually hitting the compliance satellite? When did they last visit? Are they hitting validation pages, or just the home dashboard?"*
+- **Real operator decision**: *"Is the compliance operator (or any specific user) actually hitting the compliance satellite? When did they last visit? Are they hitting validation pages, or just the home dashboard?"*
 - **Why current process can't answer it well**: No persistent HTTP access log on any satellite; visit-level engagement is invisible.
 - **Why v2 answers it better**: SQLite-indexed access log with route-template paths, principal identity, timestamps, status codes — queryable in 5 seconds via `/admin/access-log/summary?since=24h`.
 
@@ -299,7 +299,7 @@ Per [[feedback_pre_brief_discovery]]. Conducted 2026-05-27 12:30 EDT.
 3. **Substrate access-log store module** at `epicoracle_feedback/access_log_store.py`:
    - `SqliteAccessLogStore(path)` — single persistence implementation, SQLite WAL mode.
    - Schema: indexed columns on `(timestamp_utc, principal, route_template, tenant, status)`. Pagination via cursor (`(timestamp_utc, correlation_id)` composite). Append-only on the write path (no UPDATE/DELETE except retention).
-   - **Hard retention default**: 100k entries OR 100MB per satellite (whichever first); enforced by background task that runs hourly. Configurable via env vars `EPICORACLE_HTTP_LOG_MAX_ENTRIES` / `EPICORACLE_HTTP_LOG_MAX_BYTES`. **Surface to Christian at Phase 4 for ratification.**
+   - **Hard retention default**: 100k entries OR 100MB per satellite (whichever first); enforced by background task that runs hourly. Configurable via env vars `EPICORACLE_HTTP_LOG_MAX_ENTRIES` / `EPICORACLE_HTTP_LOG_MAX_BYTES`. **Surface to the product owner at Phase 4 for ratification.**
    - Read API: `query(filters, cursor, page_size)`, `summary(window)`, `count(filters)`.
 
 4. **Substrate admin router** at `epicoracle_feedback/admin_router.py`:
@@ -319,7 +319,7 @@ Per [[feedback_pre_brief_discovery]]. Conducted 2026-05-27 12:30 EDT.
 6. **Satellite adoption — hub, marketplace, compliance**:
    - Each satellite's `backend/app/main.py` adds the ASGI middleware via `app.add_middleware(...)` (single line, env-gated) and registers a `SqliteAccessLogStore` sink at startup via lifespan hook.
    - Each satellite's `backend/app/routers/admin.py` mounts the substrate's `build_access_log_router` with the satellite's existing role-gate function.
-   - **Per Christian's Phase 4 decision on admin-on-Funnel**: admin router is either (a) hard-disabled, (b) tailnet-IP-gated, or (c) auth-shimmed. Default in v2 is (b).
+   - **Per the product owner's Phase 4 decision on admin-on-Funnel**: admin router is either (a) hard-disabled, (b) tailnet-IP-gated, or (c) auth-shimmed. Default in v2 is (b).
 
 7. **Template inheritance**:
    - `epicoracle-satellite-template/backend/app/main.py` adds middleware registration with `EPICORACLE_HTTP_LOG_ENABLED=false` default.
@@ -328,7 +328,7 @@ Per [[feedback_pre_brief_discovery]]. Conducted 2026-05-27 12:30 EDT.
 
 ### Out (deferred to later waves):
 
-- **Validation-progress server-side persistence** — moved out per D-5 (Gemini's separation-of-concerns critique). Becomes a separate compliance-internal wave (compliance-W3 candidate) if Christian ratifies the scope cut at Phase 4.
+- **Validation-progress server-side persistence** — moved out per D-5 (Gemini's separation-of-concerns critique). Becomes a separate compliance-internal wave (compliance-W3 candidate) if the product owner ratifies the scope cut at Phase 4.
 - **Real Entra bearer-token auth on admin endpoints** — W2-scope existing TODO; v2's fail-closed dev-mode + tailnet-gated default is the bridge until then.
 - **Tailscale Funnel-level access logs** — Tailscale's own surface; outside substrate scope.
 - **Log retention/rotation policy beyond hard cap** — Wave B provides the hard cap; per-environment fine-tuning via env vars; longer-term retention/archive is operator-policy.
@@ -440,7 +440,7 @@ class AccessLogSummary(BaseModel):
 1. **Hit any satellite's API and verify the request appears in `/admin/access-log` within 2 seconds.** Verify `route_template` is the route pattern, not raw URL with query params.
 2. **Hit the same satellite with a different user identity and verify both principals surface in `/admin/access-log/summary`** with correct last-visit timestamps + latency aggregations.
 3. **Hit a static asset (e.g., `/_next/static/...`) and verify it does NOT appear in the log** (Content-Type exclusion working).
-4. **Hit the admin endpoint from a non-tailnet origin** and verify 403 (admin-on-Funnel security gating works — per Christian's Phase 4 decision).
+4. **Hit the admin endpoint from a non-tailnet origin** and verify 403 (admin-on-Funnel security gating works — per the product owner's Phase 4 decision).
 5. **Inspect the SQLite access-log on LLT compliance** — verify schema matches `AccessLogEntry`, timestamps are UTC, no query strings in path field, no raw request bodies captured.
 6. **Burst-test**: Hit a satellite with 1000 requests/second briefly. Verify request error rate is unchanged and `dropped_events_counter` increments cleanly without blocking responses.
 7. **Hit admin endpoint 61 times in one minute as the same principal** — verify 429 on the 61st (rate limiter works).

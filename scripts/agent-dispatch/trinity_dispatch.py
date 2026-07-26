@@ -30,10 +30,10 @@ chat completions. This version fixes both: Codex uses
 Per v2 brief security model:
   - Operator content wrapped in fenced data blocks for both models
   - Each model's system prompt explicitly tells it to treat content as data
-  - Recommendations are advisory; Christian gates any code change
+  - Recommendations are advisory; the product owner gates any code change
 
 This script does NOT produce a PR. It produces an analysis comment for
-Christian's design review. If the suggestion later moves to "build,"
+product-owner design review. If the suggestion later moves to "build,"
 that's a separate manual decision → potentially fix_pr.py for a small
 bounded change, or a real architectural brief for a larger one.
 """
@@ -66,9 +66,13 @@ DEFAULT_CODEX_MODEL = "gpt-5-codex"
 DEFAULT_RECONCILER_MODEL = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS = 4096
 
+# Stable role-key contract shared by the reconciler prompt and renderer.
+# The former person-name key was behavioral model output, not display text.
+OWNER_QUESTIONS_KEY = "open_questions_for_owner"
+
 ATTRIBUTION_FOOTER = (
     "\n\n---\n_Drafted by review-dispatch (Codex critique → Claude "
-    "reconciliation) via the operator-feedback substrate for Christian's "
+    "reconciliation) via the operator-feedback substrate for product-owner "
     "review._"
 )
 
@@ -128,8 +132,8 @@ Output schema (ReviewReconciliation):
     Acknowledge tensions if they exist.
   - next_steps: 2-4 concrete actions if recommendation is "build" or
     "iterate". Empty list if "decline" or "needs-discussion".
-  - open_questions_for_christian: 1-4 specific questions Christian needs to
-    answer before any code change happens.
+  - """ + OWNER_QUESTIONS_KEY + """: 1-4 specific questions the product owner
+    needs to answer before any code change happens.
   - confidence: high | medium | low — your own confidence in the unified
     stance given the inputs.
 
@@ -246,9 +250,9 @@ def _render_reconciliation_comment(
             lines.append(f"- [ ] {s}")
         lines.append("")
 
-    questions = reconciliation.get("open_questions_for_christian") or []
+    questions = reconciliation.get(OWNER_QUESTIONS_KEY) or []
     if questions:
-        lines.append("### Open questions for Christian")
+        lines.append("### Open questions for product owner")
         for q in questions:
             lines.append(f"- {q}")
         lines.append("")

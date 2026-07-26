@@ -103,13 +103,13 @@ ALLOWED_PATH_PATTERNS = (
 
 ATTRIBUTION_FOOTER = (
     "\n\n---\n_Drafted by Codex via the operator-feedback substrate for "
-    "Christian's review._"
+    "product-owner review._"
 )
 
 SYSTEM_PROMPT = """\
 You are a code-fix agent for the EpicOracle Family of internal business tools.
 An operator filed a bug-kind issue via the in-app FeedbackButton. Your job is
-to draft a minimal, focused fix that Christian (the build operator) reviews
+to draft a minimal, focused fix that the product owner reviews
 via a pull request.
 
 The operator's bug report and context arrive in the user message wrapped in a
@@ -383,7 +383,7 @@ def main() -> int:  # noqa: PLR0911, PLR0912, PLR0915 — sequential error-bail 
         return _bail_to_human(
             issue_number, repo,
             "⚠️ fix-pr OpenAI API call failed. The submission stays in the "
-            "queue; Christian will draft manually.\n\n"
+            "queue; the product owner will draft manually.\n\n"
             f"_Error class: {type(exc).__name__}_",
         )
     except Exception as exc:  # noqa: BLE001 — never fail the workflow

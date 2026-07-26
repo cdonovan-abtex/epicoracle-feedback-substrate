@@ -50,7 +50,7 @@ jobs:
         github.event.label.name == 'feedback/source:operator'))
     runs-on: ubuntu-latest
     # Environment gate — org secrets are scoped here. First-time use
-    # requires Christian's manual approval; subsequent runs are
+    # requires the product owner's manual approval; subsequent runs are
     # autonomous within the same workflow run.
     environment: agent-dispatch
     timeout-minutes: 15

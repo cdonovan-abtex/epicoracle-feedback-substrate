@@ -98,10 +98,10 @@ def _reconciliation() -> dict:
         "unified_recommendation": "iterate",
         "rationale": "The plumbing is straightforward; the product question is open.",
         "next_steps": [
-            "Christian + Vanessa pick 3 KPIs",
+            "Product owner + marketplace operator pick 3 KPIs",
             "Spike the polling endpoint",
         ],
-        "open_questions_for_christian": [
+        trinity_dispatch.OWNER_QUESTIONS_KEY: [
             "Which 3 KPIs unlock first value?",
             "Polling cadence target?",
         ],
@@ -192,14 +192,18 @@ def test_render_includes_convergent_divergent_next_steps_questions():
     assert "diverged" in rendered
     assert "Initial scope" in rendered
     assert "Next steps" in rendered
-    assert "[ ] Christian + Vanessa pick 3 KPIs" in rendered
-    assert "Open questions for Christian" in rendered
+    assert "[ ] Product owner + marketplace operator pick 3 KPIs" in rendered
+    assert "Open questions for product owner" in rendered
     assert "Which 3 KPIs" in rendered
     assert "Submission `abc-123`" in rendered
     # Two-voice attribution — Codex + Claude, no Gemini.
     assert "Codex" in rendered
     assert "Claude" in rendered
     assert "Gemini" not in rendered
+
+
+def test_reconciler_role_key_is_shared_by_prompt_and_renderer():
+    assert trinity_dispatch.OWNER_QUESTIONS_KEY in trinity_dispatch.RECONCILER_SYSTEM_PROMPT
 
 
 def test_render_handles_empty_divergent_section():

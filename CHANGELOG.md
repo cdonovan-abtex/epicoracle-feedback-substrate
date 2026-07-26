@@ -106,7 +106,7 @@ Feedback Substrate project.
 - `build-ghcr-image.yml` — per-satellite workflow that publishes a Docker
   image to GHCR on every main-branch merge. Produces `main-latest` and
   `sha-<sha>` tags. The sandbox-repro pulls `main-latest`.
-- `CODEOWNERS` template — Christian on `*`, separate scope for
+- `CODEOWNERS` template — product-owner review on `*`, separate scope for
   `.github/workflows/**` per v2 brief.
 
 **Tests** (84 in total, 100% passing on first integration)

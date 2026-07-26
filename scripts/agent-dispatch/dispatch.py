@@ -42,11 +42,11 @@ DECISION_TO_SCRIPT: dict[str, tuple[str, ...]] = {
     # Trinity routing key — preserved for back-compat with the triage
     # classifier — now invokes the 2-voice review (Codex critique + Claude
     # reconciliation). Analysis-only: produces a design-conversation artifact
-    # for Christian's review. No auto-PR. If the reconciled output later moves
+    # for product-owner review. No auto-PR. If the reconciled output later moves
     # to "build", that's a separate manual decision (potentially a follow-up
     # fix_pr or a real architectural brief). v0.1 wired fix_pr as a follow-up;
     # v0.2 removed that; v0.2.2 dropped the Gemini side. Terminates at
-    # fix-ready and Christian decides next steps.
+    # fix-ready and the product owner decides next steps.
     "trinity": ("trinity_dispatch.py",),
     "answer-draft": ("answer_draft.py",),
     "needs-human": (),
