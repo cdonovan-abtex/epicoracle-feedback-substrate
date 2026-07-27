@@ -2,7 +2,7 @@
 #
 # Substrate releases are the contract that all four satellites pin to.
 # A bad release blast-radiuses across the family. CODEOWNERS makes
-# Christian the required reviewer on every change.
+# the product owner the required reviewer on every change.
 
 * @cdonovan-abtex
 

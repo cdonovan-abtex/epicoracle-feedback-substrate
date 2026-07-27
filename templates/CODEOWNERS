@@ -3,7 +3,7 @@
 # Each satellite installs this file at .github/CODEOWNERS. The substrate
 # repo has its own CODEOWNERS at the equivalent path.
 #
-# v2 brief requirement: Christian on *, with a SEPARATE narrower scope
+# v2 brief requirement: product-owner review on *, with a SEPARATE narrower scope
 # for .github/workflows/** so workflow-file edits get extra attention.
 # Branch protection's "Require review from Code Owners" reads this file.
 

@@ -12,7 +12,7 @@ Operators submit feedback in-app. The substrate:
 2. Filed as a GitHub Issue in the satellite's repo with a machine-readable JSON tail.
 3. A workflow triggers agent-dispatch: triage → sandbox repro → fix-PR or trinity critique or answer-draft.
 4. Path-guard rejects PRs touching off-limits paths (`.github/workflows/**`, `Dockerfile`, `deploy/**`, `auth/**`, secrets).
-5. Christian reviews + merges. Operator's status badge transitions through `submitted → processing → fix-ready → deployed`.
+5. The product owner reviews + merges. Operator's status badge transitions through `submitted → processing → fix-ready → deployed`.
 
 Fail-soft: any failure between operator-submit and GitHub-issue lands in a JSONL inbox; a replay script drains the inbox idempotently when connectivity returns.
 
@@ -34,7 +34,7 @@ Fail-soft: any failure between operator-submit and GitHub-issue lands in a JSONL
 
 ## Why this exists
 
-Trinity-converged from the v2 brief (`02_Projects/EpicOracle Family/Operator Feedback Substrate — v2 Brief.md` in Christian's Obsidian vault). 10 BLOCKERs from Codex + Gemini critiques converged into the design captured here. Highlights:
+Trinity-converged from the v2 brief (`02_Projects/EpicOracle Family/Operator Feedback Substrate — v2 Brief.md` in the product owner's Obsidian vault). 10 BLOCKERs from Codex + Gemini critiques converged into the design captured here. Highlights:
 
 * `submission_id` (client-generated UUIDv4) — closes both reviewers' BLOCKERs on JSONL-replay double-create.
 * `GH_TOKEN` env-injection at subprocess boundary — closes Gemini BLOCKER on 12-factor / host-gh-auth-in-production.
@@ -90,7 +90,7 @@ Trinity-converged from the v2 brief (`02_Projects/EpicOracle Family/Operator Fee
 +------------------------+---------------------------------------------+
                          | PR opened
                          v
-                Christian reviews + merges
+                Product owner reviews + merges
                          |
                   Status: deployed
 ```
@@ -182,7 +182,7 @@ For a tight inner loop on the substrate itself while developing a satellite, add
 
 ```toml
 [tool.uv.sources]
-epicoracle-feedback = { path = "/Users/christiandonovan/Developer/epicoracle-feedback-substrate", editable = true }
+epicoracle-feedback = { path = "$HOME/Developer/epicoracle-feedback-substrate", editable = true }
 ```
 
 This pattern is intentionally outside the committed pyproject so other contributors / environments resolve from the pinned git tag.
@@ -231,7 +231,7 @@ If agent automation is producing bad PRs or thrashing:
 gh pr revert <PR_NUMBER> --repo cdonovan-abtex/<satellite>
 ```
 
-Creates a revert-PR for Christian's approval. Standard branch protection applies.
+Creates a revert-PR for product-owner approval. Standard branch protection applies.
 
 ### Rotating API keys
 

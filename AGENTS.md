@@ -1,4 +1,4 @@
-**Why this exists:** see [CAPTAINS-INTENT.md](CAPTAINS-INTENT.md).
+**Why this exists:** see [CHARTER.md](CHARTER.md).
 
 ## Validation
 

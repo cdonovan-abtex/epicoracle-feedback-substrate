@@ -7,7 +7,7 @@ relevant API key set, the script must NOT fail the workflow — it should
 post a clear audit comment on the issue and exit 0, so the operator's
 feedback remains queued and visible without raising spurious red CI.
 
-Christian's intent (2026-05-25): substrate ships live with zero API
+The product owner's intent (2026-05-25): substrate ships live with zero API
 secrets required; LLM-backed automation lights up as keys are added.
 """
 

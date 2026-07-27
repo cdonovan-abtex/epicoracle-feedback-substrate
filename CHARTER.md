@@ -1,16 +1,16 @@
-> **CAPTAINS-INTENT.md** — the durable WHY for `epicoracle-feedback-substrate`. This file explains the intent a change must serve; it does not explain how the code works. The HOW — build commands, module layout, contracts, security mechanics, runbooks — lives in `AGENTS.md`. As an EpicOracle Family satellite, this repo inherits the family's WHY (a satellite is valuable alone and 10x more valuable connected; the org learns from every action) and adds its own job: turn raw operator feedback into a governed GitHub flow that the agent fleet can act on under a human gate. When intent and mechanics disagree, intent wins and `AGENTS.md` gets corrected.
+> **CHARTER.md** — the durable WHY for `epicoracle-feedback-substrate`. This file explains the intent a change must serve; it does not explain how the code works. The HOW — build commands, module layout, contracts, security mechanics, runbooks — lives in `AGENTS.md`. As an EpicOracle Family satellite, this repo inherits the family's WHY (a satellite is valuable alone and 10x more valuable connected; the org learns from every action) and adds its own job: turn raw operator feedback into a governed GitHub flow that the agent fleet can act on under a human gate. When intent and mechanics disagree, intent wins and `AGENTS.md` gets corrected.
 
 ## ★ North Star
 
-A non-technical operator, anywhere, can press one button to report a bug, suggest an improvement, or ask a question — and that single act becomes a structured, idempotent, security-bounded GitHub Issue that the agent fleet can research and fix autonomously, while a human stays the only gate to merge, and the operator watches it move from *submitted → processing → fix-ready → deployed* without ever picking up a phone. The substrate collapses the operator-to-fix loop from an interruption-driven phone call into a calm asynchronous queue. It is shared infrastructure, not a one-off: it is factored once, hardened once, and inherited by every family satellite and every future fork, so the whole family improves the same way and the captain reviews instead of re-builds.
+A non-technical operator, anywhere, can press one button to report a bug, suggest an improvement, or ask a question — and that single act becomes a structured, idempotent, security-bounded GitHub Issue that the agent fleet can research and fix autonomously, while a human stays the only gate to merge, and the operator watches it move from *submitted → processing → fix-ready → deployed* without ever picking up a phone. The substrate collapses the operator-to-fix loop from an interruption-driven phone call into a calm asynchronous queue. It is shared infrastructure, not a one-off: it is factored once, hardened once, and inherited by every family satellite and every future fork, so the whole family improves the same way and the product owner reviews instead of re-building.
 
 ## The 5 Whys
 
 1. **Why does this repo exist?** Because operator feedback today arrives as an interruption — a phone call, a tap on the shoulder, an email — and dies in someone's memory. We need it captured as structured, trackable work the moment it happens.
 2. **Why must capture be structured and trackable?** Because untracked feedback can't be queued, can't be routed to an agent, can't show the operator that anything happened, and can't be audited later. A GitHub Issue is the throughput unit — it makes the work visible, dispatchable, and permanently logged.
-3. **Why route it to agents at all instead of just logging it?** Because agent throughput vastly exceeds the captain's dispatch rate when work is tightly scoped. The bottleneck is queue depth, not compute. Turning feedback into well-formed issues feeds a queue that agents drain in parallel — so fixes ship without the captain hand-carrying each one.
-4. **Why keep a human as the merge gate if agents do the work?** Because agents do the labor; humans hold the judgment. Investigate-then-fix with a mandatory human approval between them is the entire safety model. The operator's text is untrusted data, the agent's output is a proposal, and nothing reaches `main` or production without the captain's review. Autonomy without that gate is how trust dies.
-5. **Why build it as a shared, inheritable substrate rather than inline in each app?** (root) Because the family's whole premise is that you build the capability once, correctly, and every member inherits it — so the org learns the same way everywhere, corporate migration is a config swap not a rewrite, and a fix to the substrate is a fix for the entire family at once. The root is: **leverage through shared, sovereign, governed infrastructure — the captain reviews and the fleet executes, forever.**
+3. **Why route it to agents at all instead of just logging it?** Because agent throughput vastly exceeds the product owner's dispatch rate when work is tightly scoped. The bottleneck is queue depth, not compute. Turning feedback into well-formed issues feeds a queue that agents drain in parallel — so fixes ship without the product owner hand-carrying each one.
+4. **Why keep a human as the merge gate if agents do the work?** Because agents do the labor; humans hold the judgment. Investigate-then-fix with a mandatory human approval between them is the entire safety model. The operator's text is untrusted data, the agent's output is a proposal, and nothing reaches `main` or production without product-owner review. Autonomy without that gate is how trust dies.
+5. **Why build it as a shared, inheritable substrate rather than inline in each app?** (root) Because the family's whole premise is that you build the capability once, correctly, and every member inherits it — so the org learns the same way everywhere, corporate migration is a config swap not a rewrite, and a fix to the substrate is a fix for the entire family at once. The root is: **leverage through shared, sovereign, governed infrastructure — the product owner reviews and the fleet executes, forever.**
 
 ## The Heart
 
@@ -25,7 +25,7 @@ The irreducible core — what must always stay true no matter how the implementa
 
 ## Lessons
 
-- **Queue depth is the bottleneck, not agent capacity.** The captain's role is queue-feeder and reviewer; the substrate exists to keep the queue well-formed and flowing.
+- **Queue depth is the bottleneck, not agent capacity.** The product owner's role is queue-feeder and reviewer; the substrate exists to keep the queue well-formed and flowing.
 - **Investigate-then-fix beats fix-on-sight.** A human reading the proposed approach *before* the fix runs is the gate operationalized — collaboration, not automation replacing decisions.
 - **A private repo is storage, not privacy.** Real protection is classification, scrubbing of obvious secrets at intake, and access control — never "it's a private repo."
 - **Untrusted content through `env:`, never inline interpolation.** Operator and issue text reaches scripts as environment values, not spliced into command lines. This is non-negotiable, structural injection prevention.
@@ -65,7 +65,7 @@ The irreducible core — what must always stay true no matter how the implementa
 
 - An operator reports a problem in one tap and sees it acknowledged and tracked — no phone call, no lost feedback.
 - Feedback survives a GitHub outage: it queues locally and replays without the operator noticing.
-- Well-formed issues flow into a queue that agents drain in parallel, faster than the captain could hand-dispatch.
+- Well-formed issues flow into a queue that agents drain in parallel, faster than the product owner could hand-dispatch.
 - Every fix that reaches `main` passed a human review; nothing self-merges.
 - The operator can watch their item move through states to "deployed" in-app.
 - Operator text never acts as instruction; obvious secrets are rejected at intake.
