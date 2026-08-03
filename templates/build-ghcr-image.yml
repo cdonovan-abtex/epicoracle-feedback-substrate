@@ -1,38 +1,40 @@
-# Build & publish satellite Docker image to GHCR on main-branch merge.
+# GHCR publisher template — intentionally disabled while migration is deferred.
 #
-# Each satellite installs this file at .github/workflows/build-ghcr-image.yml.
-# Produces two tags per build:
+# A repository copied from this template must not claim image publishing is
+# active until Captain separately authorizes GHCR activation. When that day
+# comes, the exact package identity is the repository basename by default, or
+# an explicit package name for a deliberate mismatch. Private pulls require
+# ``packages: read``, exact repository/package access, and an explicit source
+# label on the published image.
 #
-#   ghcr.io/cdonovan-abtex/<repo>:main-latest     ← always the freshest main
-#   ghcr.io/cdonovan-abtex/<repo>:sha-<sha>       ← reproducibility anchor
-#
-# The agent-dispatch sandbox pulls ``main-latest`` for repro runs. Sha tags
-# stay around in case we need to bisect ("when did this bug get introduced
-# vs. fixed?").
-#
-# Per-satellite Dockerfile requirements (documented in substrate README):
-#
-#   * Default ENV runs in synthetic mode (SYNTHETIC_MODE=true, AUTH_DISABLED=true)
-#   * Health endpoint at GET /health returning 200 when ready
-#   * Listens on port 8000 by default
-#   * No external network dependencies in synthetic mode
-#
-# This workflow uses the GITHUB_TOKEN — no additional secret rotation. The
-# ``packages: write`` permission is the minimum needed to push to GHCR.
+# This template is a disabled artifact by default: it shows the future seam
+# but does not publish on push and does not become active unless a repo owner
+# explicitly opts in.
 
-name: Build & Publish Image
+name: Build & Publish Image (disabled)
+
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
-  build-and-push:
+  disabled-note:
+    if: ${{ vars.GHCR_PUBLISHING_ENABLED != 'true' }}
     runs-on: ubuntu-latest
+    steps:
+      - name: Explain why publishing is disabled
+        run: |
+          cat <<'EOF'
+          GHCR publishing is disabled while migration is deferred.
+          Future activation requires Captain approval, private package access,
+          packages: read, exact repository/package access, and source labeling.
+          EOF
+
+  publish:
+    if: ${{ vars.GHCR_PUBLISHING_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -51,9 +53,10 @@ jobs:
         with:
           context: .
           push: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/abtex/${{ github.event.repository.name }}
           tags: |
-            ghcr.io/cdonovan-abtex/${{ github.event.repository.name }}:main-latest
-            ghcr.io/cdonovan-abtex/${{ github.event.repository.name }}:sha-${{ github.sha }}
-          # Cache layers across builds — Buildx-native, no extra config.
+            ghcr.io/abtex/${{ github.event.repository.name }}:main-latest
+            ghcr.io/abtex/${{ github.event.repository.name }}:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

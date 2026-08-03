@@ -102,7 +102,7 @@ Trinity-converged from the v2 brief (`02_Projects/EpicOracle Family/Operator Fee
 ```toml
 [project]
 dependencies = [
-  "epicoracle-feedback @ git+https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git@v0.1.0",
+  "epicoracle-feedback @ git+https://github.com/abtex/epicoracle-feedback-substrate.git@v0.1.0",
 ]
 ```
 
@@ -157,13 +157,13 @@ async def submit_feedback(body: FeedbackSubmitBody, principal: Principal):
 ### 3. Install the workflow templates
 
 Copy `templates/agent-dispatch.yml` to `.github/workflows/agent-dispatch.yml` in your satellite.
-Copy `templates/build-ghcr-image.yml` to `.github/workflows/build-ghcr-image.yml` (required for sandbox repro).
+Copy `templates/build-ghcr-image.yml` to `.github/workflows/build-ghcr-image.yml` only if you want the disabled GHCR placeholder; it does not publish while migration is deferred.
 Copy `templates/CODEOWNERS` to `.github/CODEOWNERS` and adjust if needed.
 
 ### 4. Configure branch protection
 
 ```bash
-./scripts/setup-branch-protection.sh cdonovan-abtex/<your-satellite-repo>
+./scripts/setup-branch-protection.sh abtex/<your-satellite-repo>
 ```
 
 ### 5. Set required org-level secrets
@@ -174,7 +174,9 @@ In your org settings, environments, `agent-dispatch`:
 * `GEMINI_API_KEY`
 * `ANTHROPIC_API_KEY`
 
-Set the repo variable `SATELLITE_SLUG` (e.g. `marketplace`, `compliance`, `hub`) so the sandbox-repro script knows which GHCR image to pull.
+GHCR sandbox/publishing stays disabled by default while migration is deferred. The sandbox gate is `GHCR_SANDBOX_ENABLED`; the publisher gate is `GHCR_PUBLISHING_ENABLED`. Future activation requires separate Captain approval, private authenticated package access, `packages: read`, exact repository/package access, and the `org.opencontainers.image.source` label.
+
+When that future seam is explicitly enabled, `GHCR_PACKAGE_NAME` is the package identity override; otherwise the sandbox uses the current repository basename. `SATELLITE_SLUG` is product/event identity only and does not derive package names.
 
 ## Per-user dev-override (local editable install)
 
@@ -189,7 +191,7 @@ This pattern is intentionally outside the committed pyproject so other contribut
 
 ## Per-satellite Dockerfile requirements
 
-The sandbox-repro script pulls `ghcr.io/cdonovan-abtex/<satellite>:main-latest`. Each satellite's `Dockerfile` must:
+The sandbox-repro script is disabled by default while GHCR migration is deferred. When Captain separately authorizes the seam, it pulls `ghcr.io/abtex/<repository-basename>:main-latest` unless `GHCR_PACKAGE_NAME` explicitly overrides the package name. Each satellite's `Dockerfile` must:
 
 * Default ENV runs in synthetic mode: `SYNTHETIC_MODE=true`, `AUTH_DISABLED=true`, `TENANT=synthetic`, `EPICOR_DISABLED=true`, `SP_API_DISABLED=true`
 * Expose a `GET /health` endpoint that returns 200 when ready (used by the sandbox to wait for boot)
@@ -206,12 +208,12 @@ When the dispatcher fails-soft, payloads accumulate in `backend/storage/feedback
 # DRY-RUN — see what would happen
 python scripts/replay-feedback-inbox.py \
     --inbox backend/storage/feedback_inbox.jsonl \
-    --repo cdonovan-abtex/epicoracle-marketplace
+    --repo abtex/epicoracle-marketplace
 
 # COMMIT — actually replay
 python scripts/replay-feedback-inbox.py \
     --inbox backend/storage/feedback_inbox.jsonl \
-    --repo cdonovan-abtex/epicoracle-marketplace \
+    --repo abtex/epicoracle-marketplace \
     --commit
 ```
 
@@ -228,7 +230,7 @@ If agent automation is producing bad PRs or thrashing:
 ### Reverting a bad agent PR
 
 ```bash
-gh pr revert <PR_NUMBER> --repo cdonovan-abtex/<satellite>
+gh pr revert <PR_NUMBER> --repo abtex/<satellite>
 ```
 
 Creates a revert-PR for product-owner approval. Standard branch protection applies.
@@ -238,7 +240,7 @@ Creates a revert-PR for product-owner approval. Standard branch protection appli
 `CODEX_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` are org-level secrets scoped to the `agent-dispatch` environment.
 
 ```
-GitHub -> cdonovan-abtex org -> Settings -> Secrets -> Environments -> agent-dispatch
+GitHub -> abtex org -> Settings -> Secrets -> Environments -> agent-dispatch
 ```
 
 Rotation:
@@ -265,7 +267,7 @@ The agent-dispatch sandbox runs **deny-by-default network egress**:
 | Destination | Allowed? | Why |
 |---|---|---|
 | `api.github.com`, `*.githubusercontent.com` | Yes | Issue + PR operations |
-| `ghcr.io` | Yes | Image pull |
+| `ghcr.io` | No (deferred) | GHCR sandbox/publishing is disabled by default |
 | `api.anthropic.com` | Yes | Claude answer-draft |
 | `api.openai.com` | Yes (when Codex) | Fix-PR |
 | `generativelanguage.googleapis.com` | Yes (when Gemini) | Trinity critique |
@@ -316,7 +318,8 @@ scripts/agent-dispatch/     Invoked by .github/workflows/agent-dispatch.yml
   setup.sh                  uv + node + playwright (version-pinned)
   triage.py                 classifier - kind + surface + security keywords
   dispatch.py               routes to sandbox / trinity / answer-draft
-  sandbox_repro.py          GHCR image pull + Playwright headless repro
+  ghcr.py                   GHCR image-coordinate contract + disabled-by-default gate
+  sandbox_repro.py          disabled GHCR pull seam + Playwright headless repro
   fix_pr.py                 Codex code-edit + PR creation
   trinity_dispatch.py       parallel Codex + Gemini critique on suggestion
   answer_draft.py           Claude one-shot answer for questions
@@ -328,7 +331,7 @@ scripts/
 
 templates/
   agent-dispatch.yml        -> .github/workflows/agent-dispatch.yml
-  build-ghcr-image.yml      -> .github/workflows/build-ghcr-image.yml
+  build-ghcr-image.yml      -> .github/workflows/build-ghcr-image.yml (disabled artifact)
   CODEOWNERS                -> .github/CODEOWNERS
 
 tests/                      pytest - port marketplace's existing + add new
