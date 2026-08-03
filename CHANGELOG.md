@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- GHCR sandbox pulls and image publishing are disabled by default while migration is deferred.
+- The reusable GHCR contract now derives package identity from the repository basename unless an explicit package name is provided.
+- Workflow templates now advertise the disabled GHCR artifact and the future activation seam instead of implying an always-on publisher.
+- Historical release notes below keep their original namespace references only where they preserve released history.
+
 ## [v0.2.1] - 2026-05-28
 
 ### Changed

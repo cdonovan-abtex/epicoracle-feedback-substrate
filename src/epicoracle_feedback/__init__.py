@@ -21,6 +21,13 @@ from epicoracle_feedback.events import (
     emit_feedback_event,
     register_event_sink,
 )
+from epicoracle_feedback.ghcr import (
+    DEFAULT_GHCR_TAG,
+    GHCR_PACKAGE_NAME_ENV,
+    GHCR_SANDBOX_ENABLED_ENV,
+    resolve_ghcr_image,
+    sandbox_pull_enabled,
+)
 from epicoracle_feedback.http_events import (
     HttpEvent,
     emit_http_event,
@@ -36,8 +43,11 @@ from epicoracle_feedback.payload import (
 __version__ = "0.2.0"
 
 __all__ = [
+    "DEFAULT_GHCR_TAG",
     "DEFAULT_INBOX_PATH",
     "DEFAULT_LABELS",
+    "GHCR_PACKAGE_NAME_ENV",
+    "GHCR_SANDBOX_ENABLED_ENV",
     "GH_TIMEOUT_S",
     "FeedbackDispatchResult",
     "FeedbackEvent",
@@ -52,5 +62,7 @@ __all__ = [
     "register_event_sink",
     "register_http_event_sink",
     "resolve_gh_token",
+    "resolve_ghcr_image",
+    "sandbox_pull_enabled",
     "scan_for_credentials",
 ]

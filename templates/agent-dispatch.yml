@@ -12,9 +12,12 @@
 #   * Path-guard step rejects PRs touching off-limits paths
 #
 # Per the v2 brief, the substrate is consumed via:
-#   pyproject:  epicoracle-feedback @ git+https://github.com/cdonovan-abtex/epicoracle-feedback-substrate.git@v0.1.0
+#   pyproject:  epicoracle-feedback @ git+https://github.com/abtex/epicoracle-feedback-substrate.git@v0.1.0
 # Scripts are invoked from the installed package or from a vendored copy
 # of the substrate cloned at workflow runtime — see setup.sh.
+# GHCR sandbox/publisher stay disabled by default while migration is deferred.
+# Future activation requires separate Captain authorization, private package
+# access, packages: read, exact repository/package access, and source labels.
 
 name: Agent Dispatch
 on:
@@ -62,7 +65,8 @@ jobs:
       ISSUE_TITLE: ${{ github.event.issue.title }}
       ISSUE_BODY: ${{ github.event.issue.body }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      SATELLITE_SLUG: ${{ vars.SATELLITE_SLUG }}
+      GHCR_SANDBOX_ENABLED: ${{ vars.GHCR_SANDBOX_ENABLED || 'false' }}
+      GHCR_PACKAGE_NAME: ${{ vars.GHCR_PACKAGE_NAME || '' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Org-level secrets, scoped to this environment.
       CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
@@ -76,7 +80,7 @@ jobs:
       - name: Checkout substrate scripts (pinned)
         uses: actions/checkout@v4
         with:
-          repository: cdonovan-abtex/epicoracle-feedback-substrate
+          repository: abtex/epicoracle-feedback-substrate
           ref: v0.1.0
           path: .substrate
           token: ${{ secrets.SUBSTRATE_READ_TOKEN || secrets.GITHUB_TOKEN }}

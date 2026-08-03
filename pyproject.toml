@@ -30,8 +30,8 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/cdonovan-abtex/epicoracle-feedback-substrate"
-Issues = "https://github.com/cdonovan-abtex/epicoracle-feedback-substrate/issues"
+Repository = "https://github.com/abtex/epicoracle-feedback-substrate"
+Issues = "https://github.com/abtex/epicoracle-feedback-substrate/issues"
 
 [build-system]
 requires = ["hatchling>=1.24"]
